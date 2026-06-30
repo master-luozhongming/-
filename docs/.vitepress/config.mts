@@ -1,4 +1,5 @@
 import { defineConfig } from 'vitepress'
+import mathjax3 from 'markdown-it-mathjax3'
 
 export default defineConfig({
   title: "强化学习与大模型教程",
@@ -11,6 +12,28 @@ export default defineConfig({
 
   // 禁用死链接检查
   ignoreDeadLinks: true,
+
+  // 数学公式支持
+  markdown: {
+    config: (md) => {
+      md.use(mathjax3)
+    }
+  },
+
+  // 数学公式渲染后的样式
+  head: [
+    [
+      'style',
+      {},
+      `
+      mjx-container {
+        overflow-x: auto;
+        overflow-y: hidden;
+        max-width: 100%;
+      }
+      `
+    ]
+  ],
 
   themeConfig: {
     logo: '/logo.svg',

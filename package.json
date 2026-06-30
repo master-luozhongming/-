@@ -17,6 +17,7 @@
   "author": "master-luozhongming",
   "license": "MIT",
   "devDependencies": {
+    "markdown-it-mathjax3": "^4.3.2",
     "vitepress": "^1.0.0"
   }
 }
