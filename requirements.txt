@@ -1,0 +1,13 @@
+# 强化学习与大模型教程 - 依赖列表
+
+# 核心依赖
+gym>=0.25.0
+torch>=1.9.0
+numpy>=1.21.0
+matplotlib>=3.4.0
+
+# 可选依赖
+# pygame>=2.0.0  # 用于环境渲染
+# tensorboard>=2.5.0  # 用于训练可视化
+# transformers>=4.10.0  # 用于 LLM 相关代码
+# accelerate>=0.12.0  # 用于分布式训练
