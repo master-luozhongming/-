@@ -45,7 +45,7 @@ def main():
     cleaned_content = clean_content(content)
 
     # 写入文件
-    with open('docs/04-ppo/03-math.md', 'w', encoding='utf-8') as f:
+    with open('docs/03-policy-gradient/01-vanilla-pg.md', 'w', encoding='utf-8') as f:
         f.write(cleaned_content)
 
     print("清理完成！")
