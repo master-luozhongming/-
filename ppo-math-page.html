@@ -1,0 +1,1829 @@
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="把 407 页满是公式和代码的 AI 教程，翻译成产品经理和新人也能看懂的大白话">
+      
+      
+        <meta name="author" content="左元（原著）· 大白话重写">
+      
+      
+      
+        <link rel="prev" href="../07-ppo-in-practice/">
+      
+      
+        <link rel="next" href="../09-grpo/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>08 PPO 背后的数学 - Modelshit Class</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Geist:300,300i,400,400i,700,700i%7CGeist+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Geist";--md-code-font:"Geist Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#08-ppo" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href="../.." title="Modelshit Class" class="md-header__button md-logo" aria-label="Modelshit Class" data-md-component="logo">
+      
+  <img src="../../assets/logo.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Modelshit Class
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              08 PPO 背后的数学
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="indigo"  aria-label="切换到暗色模式"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="切换到暗色模式" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="indigo"  aria-label="切换到亮色模式"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="切换到亮色模式" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="搜索" placeholder="搜索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="查找">
+        
+        <button type="reset" class="md-search__icon md-icon" title="清空当前内容" aria-label="清空当前内容" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            正在初始化搜索引擎
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/kuzicode" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    kuzicode
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Modelshit Class" class="md-nav__button md-logo" aria-label="Modelshit Class" data-md-component="logo">
+      
+  <img src="../../assets/logo.svg" alt="logo">
+
+    </a>
+    Modelshit Class
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/kuzicode" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    kuzicode
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    首页
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    第一部分 · 基础与大语言模型
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    第一部分 · 基础与大语言模型
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00-foundations/01-microgpt/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    01 microGPT：60 行看懂大模型全貌
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00-foundations/02-llm-intro/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    02 大模型在干嘛：预测下一个词
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00-foundations/03-gpt2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    03 GPT-2：把 Transformer 拆开看
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    第二部分 · 强化学习
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    第二部分 · 强化学习
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../04-rl-intro/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    04 强化学习是什么
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../05-policy-gradient/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    05 策略梯度法
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../06-ppo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    06 PPO：稳一点的策略更新
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../07-ppo-in-practice/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    07 PPO 实战
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    08 PPO 背后的数学
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    08 PPO 背后的数学
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ?? 先讲个直觉
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ?? 核心概念（说人话）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="?? 核心概念（说人话）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-kl" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ① KL 散度：两个"概率分布"差多远
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ② 信息论三件套：信息量、熵、交叉熵
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ③ 重要性采样：用别人的数据算我的账
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ④ 替代目标：把"没法算的目标"换成"能算的目标"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-tv-kl" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ⑤ 误差有多大？用 TV 距离和 KL 兜底
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ?? 必要的公式
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ?? 代码长什么样
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ??? 一图看懂
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#take" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ?? 产品经理 take
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../09-grpo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    09 GRPO：去掉评论家
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    第三部分 · 大模型对齐与微调
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    第三部分 · 大模型对齐与微调
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../02-rlhf/10-llm-training-overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    10 大模型训练全流程
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../02-rlhf/11-dpo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    11 DPO：不用强化学习也能对齐
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../02-rlhf/12-ppo-instructgpt/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    12 用 PPO 复刻 InstructGPT
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../02-rlhf/13-grpo-deepseek-r1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    13 用 GRPO 复刻 DeepSeek-R1
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    第四部分 · 多模态
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    第四部分 · 多模态
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../03-multimodal/14-vit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    14 Vision Transformer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../03-multimodal/15-clip/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    15 CLIP：让图文站到同一空间
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../03-multimodal/16-clipcap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    16 ClipCap：看图说话
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../03-multimodal/17-diffusion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    17 扩散模型：从噪声里画画
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../03-multimodal/18-diffusion-math/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    18 扩散模型背后的数学
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../03-multimodal/19-conditional-diffusion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    19 条件扩散：让它画我想要的
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../03-multimodal/20-dalle2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    20 DALL-E 2：文生图全家桶
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    附录
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    附录
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../99-appendix/21-summary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    21 全书总结
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../99-appendix/A-uv/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    A uv：Python 环境管理
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ?? 先讲个直觉
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ?? 核心概念（说人话）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="?? 核心概念（说人话）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-kl" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ① KL 散度：两个"概率分布"差多远
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ② 信息论三件套：信息量、熵、交叉熵
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ③ 重要性采样：用别人的数据算我的账
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ④ 替代目标：把"没法算的目标"换成"能算的目标"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-tv-kl" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ⑤ 误差有多大？用 TV 距离和 KL 兜底
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ?? 必要的公式
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ?? 代码长什么样
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ??? 一图看懂
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#take" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ?? 产品经理 take
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="08-ppo">08 PPO 背后的数学<a class="headerlink" href="#08-ppo" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p>?? <strong>一句话导读</strong>：上一章你已经会用 PPO 训模型了，但它为什么长这个样子——又是裁剪、又是新旧策略比值、又是 KL？这一章把 PPO 的"设计理由"一层层拆开。学完你会明白：PPO 不是一堆魔法公式拼出来的，而是为了回答一个朴素问题——<strong>"怎么让模型每次都进步一点点、绝不退步、还顺手把旧数据复用了？"</strong> 看懂之后，你调 PPO 的超参（尤其那个 <code>clip</code> 范围）就不再是瞎试了。</p>
+</blockquote>
+<h2 id="_1">?? 先讲个直觉<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
+<p>先说 PPO 想解决的两个痛点，都很接地气。</p>
+<p><strong>痛点一：策略会"突然崩盘"。</strong> 想象你在教一个新手开车。他开得还行，你一句"油门再大胆点！"——结果他猛踩油门，撞了。撞完之后他吓得乱开，越开越烂，再也回不到之前的水平了。强化学习里这叫<strong>性能崩溃（performance collapse）</strong>：模型某一步更新太猛，策略变得很差，然后它用这个差策略产生的烂数据继续训练，越训越烂，一蹶不振。</p>
+<p><strong>PPO 的第一个主张</strong>：<strong>别一脚油门到底，每次只让模型改一点点</strong>。只要每一步都"要么进步、要么原地不动，绝不退步"，就永远不会崩。这叫<strong>单调改进（monotonic improvement，说人话就是"只升不降"）</strong>。</p>
+<p><strong>痛点二：数据用一次就扔，太浪费。</strong> 模型每更新一次，旧数据理论上就"过期"了（因为它是旧策略产生的），得重新跑环境采集新数据。采数据很贵。</p>
+<p><strong>PPO 的第二个主张</strong>：<strong>旧数据还能再榨一榨</strong>。用一个数学技巧（重要性采样），把"旧策略收集的数据"打个折扣，拿来更新新策略。</p>
+<p>这一章剩下的全部数学，都是在严谨地回答这两件事："怎么保证只升不降"和"怎么安全地复用旧数据"。我们先备齐几样工具——KL 散度、信息论、重要性采样——再用它们拼出 PPO。</p>
+<h2 id="_2">?? 核心概念（说人话）<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
+<h3 id="1-kl">① KL 散度：两个"概率分布"差多远<a class="headerlink" href="#1-kl" title="Permanent link">&para;</a></h3>
+<p><strong>KL 散度（Kullback-Leibler Divergence，KLD，说人话就是"两套概率猜法差多远"）</strong>。</p>
+<p>举个最简单的例子。一枚硬币，<strong>真实</strong>是正面 70%、反面 30%（记作分布 <span class="arithmatex">\(p\)</span>）。现在三个人来猜它（记作分布 <span class="arithmatex">\(q\)</span>）：</p>
+<ul>
+<li>甲猜：正反各 50%。离真相有点差。</li>
+<li>乙猜：正面 20%、反面 80%。离真相差很远。</li>
+<li>丙猜：正面 70%、反面 30%。猜得跟真相一模一样。</li>
+</ul>
+<p>KL 散度就是给"猜得准不准"打的分：甲约 0.082，乙约 0.58，丙正好 0。<strong>两个分布越像，KL 越小；完全一样时是 0；越不像，KL 越大。</strong> 就这么个直觉。</p>
+<p>它有个怪脾气要记住：<strong>KL 不对称</strong>——"用甲衡量真相"和"用真相衡量甲"算出来不一样，所以它不是严格意义上的"距离"，只是一个"差异程度"的度量。</p>
+<h3 id="2">② 信息论三件套：信息量、熵、交叉熵<a class="headerlink" href="#2" title="Permanent link">&para;</a></h3>
+<p>这三个是理解 KL 的地基，一句话一个：</p>
+<ul>
+<li><strong>信息量（Self-Information）</strong>：一件事越<strong>不可能</strong>发生，它一旦发生，带来的"信息"就越多。"太阳从东边升起"几乎没信息量（早知道了），"你中了彩票"信息量爆炸。</li>
+<li><strong>熵（Entropy，说人话就是"有多不确定"）</strong>：一个随机事件整体有多难猜。抛硬币 50/50 最难猜，熵最大；如果硬币 99% 出正面，几乎一猜一个准，熵很小。</li>
+<li><strong>交叉熵（Cross-Entropy）</strong>：你<strong>用一套猜法 <span class="arithmatex">\(Q\)</span> 去描述真实世界 <span class="arithmatex">\(P\)</span></strong>，平均要"惊讶"多少。猜得越准越不惊讶。眼熟吧？这就是上一卷训练大模型时的那个交叉熵损失。</li>
+</ul>
+<p>它们和 KL 的关系特别漂亮：<strong>KL = 交叉熵 ? 真实分布的熵</strong>。而真实分布的熵是个固定常数，所以<strong>"最小化 KL"和"最小化交叉熵"其实是同一件事</strong>。这就把"监督学习里训模型"和"RL 里约束策略别跑偏"两件事用同一根线串起来了。</p>
+<h3 id="3">③ 重要性采样：用别人的数据算我的账<a class="headerlink" href="#3" title="Permanent link">&para;</a></h3>
+<p>这是 PPO 复用旧数据的命根子。</p>
+<p><strong>问题</strong>：我想知道"按新策略 <span class="arithmatex">\(\pi\)</span> 行动，平均能拿多少分"。但我手里只有<strong>旧策略 <span class="arithmatex">\(b\)</span></strong> 跑出来的数据，没有新策略的数据（因为新策略还没生出来呢）。</p>
+<p><strong>重要性采样（Importance Sampling，说人话就是"借别人的样本，乘个权重折算成自己的"）</strong> 的办法：拿旧数据来用，但每条数据乘一个<strong>权重</strong> <span class="arithmatex">\(\rho = \dfrac{\pi(x)}{b(x)}\)</span>。</p>
+<p>直觉：某个动作在新策略下"本该常出现"，但旧策略里很少出现——那它每次一出现，就<strong>加大权重补偿</strong>，仿佛它出现了更多次。反过来，新策略里本该少见的，就<strong>调小权重</strong>。</p>
+<p><strong>代价</strong>：这么一折算，估计值会"抖"得更厉害（<strong>方差（variance）变大</strong>，意思是同样多的样本，估出来的结果忽高忽低、不稳）。书里那个例子很说明问题：普通采样方差只有 0.27，换成重要性采样飙到 10.63。</p>
+<p><strong>怎么压住方差</strong>：让<strong>新旧两个策略尽量接近</strong>，权重 <span class="arithmatex">\(\rho\)</span> 就都贴近 1，折算就温和，方差就小。把 <span class="arithmatex">\(b\)</span> 从 <code>[1/3,1/3,1/3]</code> 调到更像真实分布的 <code>[0.2,0.2,0.6]</code>，方差立刻从 10.63 掉到 2.48。</p>
+<blockquote>
+<p>?? <strong>划重点</strong>：这条结论是 PPO 的灵魂——"<strong>新旧策略别差太远</strong>"既能压住重要性采样的方差，又能防止性能崩溃。PPO 后面所有的裁剪、KL 约束，都是在干这一件事。</p>
+</blockquote>
+<h3 id="4">④ 替代目标：把"没法算的目标"换成"能算的目标"<a class="headerlink" href="#4" title="Permanent link">&para;</a></h3>
+<p>我们真正想最大化的是"新策略比旧策略好多少"，即 <span class="arithmatex">\(J(\theta) - J(\theta_{\text{old}})\)</span>。但它有个死结：算它需要<strong>用新策略去采样</strong>，可新策略还没训出来——<strong>鸡生蛋蛋生鸡</strong>。</p>
+<p>解法：用重要性采样把它改写成"<strong>用旧策略的数据 + 新旧策略概率比值</strong>"。改写出来的这个能算的目标，就叫<strong>替代目标（Surrogate Objective）</strong>，学名 CPI（保守策略迭代）。它是真实目标的一个近似——只在新旧策略足够接近时才准。</p>
+<h3 id="5-tv-kl">⑤ 误差有多大？用 TV 距离和 KL 兜底<a class="headerlink" href="#5-tv-kl" title="Permanent link">&para;</a></h3>
+<p>既然替代目标只是"近似"，就得知道它能差多远。这个误差来自<strong>状态访问分布（state visitation distribution）</strong>的差异——后面图解里细讲，先记住一句话：<strong>策略变了，模型走过的"路线"也会变，导致看到的数据分布整个偏掉</strong>。</p>
+<p>衡量这个偏差，先用<strong>全变差距离（Total Variation Distance，TV，说人话就是"两个分布在所有事件上最大能差多少"）</strong>，再通过一个叫 <strong>Pinsker 不等式</strong>的桥，把它换算成我们熟悉的 KL。最后得到一个干净的结论：<strong>误差 ≤ 某常数 × √KL</strong>。KL 小，误差就小，替代目标就可信。</p>
+<h2 id="_3">?? 必要的公式<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
+<p><strong>KL 散度（离散版）：</strong></p>
+<div class="arithmatex">\[ D_{\text{KL}}(p \parallel q) = \sum_x p(x)\,\log\frac{p(x)}{q(x)} \]</div>
+<blockquote>
+<p>?? <strong>人话翻译</strong>：逐个事件看——真实概率 <span class="arithmatex">\(p(x)\)</span> 当权重，里头那个 <span class="arithmatex">\(\log\frac{p(x)}{q(x)}\)</span> 是"你猜的 <span class="arithmatex">\(q\)</span> 和真相 <span class="arithmatex">\(p\)</span> 在这件事上偏了几倍"。两套猜法处处一样时，每个 <span class="arithmatex">\(\log\frac{p}{q}=\log 1 = 0\)</span>，总和为 0；偏得越多，值越大。</p>
+</blockquote>
+<p><strong>KL = 交叉熵 ? 熵：</strong></p>
+<div class="arithmatex">\[ D_{\text{KL}}(P \parallel Q) = \underbrace{-H(P)}_{\text{真实分布的熵(常数)}} + \underbrace{H(P,Q)}_{\text{交叉熵}} \]</div>
+<blockquote>
+<p>?? <strong>人话翻译</strong>：真实分布 <span class="arithmatex">\(P\)</span> 自带的"不确定性" <span class="arithmatex">\(H(P)\)</span> 是个固定数，跟你怎么猜无关。所以想让 KL 变小，你能动的只有交叉熵那一项。<strong>"让分布对齐"和"训练时降交叉熵损失"是同一件事。</strong></p>
+</blockquote>
+<p><strong>重要性采样：用 <span class="arithmatex">\(Q\)</span> 的样本估 <span class="arithmatex">\(P\)</span> 的期望：</strong></p>
+<div class="arithmatex">\[ \mathbb{E}_{x\sim P}[f(x)] = \mathbb{E}_{x\sim Q}\!\left[\frac{P(x)}{Q(x)}f(x)\right] \approx \frac{1}{|D|}\sum_{x\in D}\frac{P(x)}{Q(x)}f(x),\quad D\sim Q \]</div>
+<blockquote>
+<p>?? <strong>人话翻译</strong>：我想要"按 <span class="arithmatex">\(P\)</span> 行动的平均结果"，手里却只有 <span class="arithmatex">\(Q\)</span> 采的样。没关系，给每个样本乘上权重 <span class="arithmatex">\(\frac{P(x)}{Q(x)}\)</span>（它在 <span class="arithmatex">\(P\)</span> 下该多受重视 ÷ 在 <span class="arithmatex">\(Q\)</span> 下实际多常见），加权平均一下，就折算成 <span class="arithmatex">\(P\)</span> 的答案了。</p>
+</blockquote>
+<p><strong>这个折算的方差（为什么 <span class="arithmatex">\(P\)</span>、<span class="arithmatex">\(Q\)</span> 别差太远）：</strong></p>
+<div class="arithmatex">\[ \text{var} = \frac{1}{N}\left(\mathbb{E}_{x\sim P}\!\left[\frac{P(x)}{Q(x)}f(x)^2\right] - \mathbb{E}_{x\sim P}[f(x)]^2\right) \]</div>
+<blockquote>
+<p>?? <strong>人话翻译</strong>：盯住那个 <span class="arithmatex">\(\frac{P(x)}{Q(x)}\)</span>。如果在某个"<span class="arithmatex">\(P\)</span> 觉得重要、<span class="arithmatex">\(Q\)</span> 却很少采到"的地方，这个比值会大得离谱，整个方差直接爆炸。结论：<strong><span class="arithmatex">\(Q\)</span>（旧策略）和 <span class="arithmatex">\(P\)</span>（新策略）越接近，比值越贴近 1，估计越稳。</strong></p>
+</blockquote>
+<p><strong>替代目标（CPI / surrogate）：</strong></p>
+<div class="arithmatex">\[ J^{\text{CPI}}_{\pi_{\theta_{\text{old}}}}(\theta) = \mathbb{E}_{\tau\sim\pi_{\theta_{\text{old}}}}\!\left[\sum_{t=0}^{T} \frac{\pi_\theta(a_t\mid s_t)}{\pi_{\theta_{\text{old}}}(a_t\mid s_t)}\, A_t^{\pi_{\theta_{\text{old}}}}\right] \]</div>
+<blockquote>
+<p>?? <strong>人话翻译</strong>：拿<strong>旧策略跑出来的轨迹</strong>（外面那个 <span class="arithmatex">\(\mathbb{E}_{\tau\sim\pi_{\theta_{\text{old}}}}\)</span>），对每一步的优势 <span class="arithmatex">\(A_t\)</span>（这个动作比平均好多少）乘上<strong>新旧策略的概率比值</strong>。新策略更爱做的动作就放大它的功劳，新策略不爱做的就缩小。这样<strong>不用新策略采样，也能估出"新策略好多少"</strong>——鸡生蛋的死结解开了。</p>
+</blockquote>
+<p><strong>误差上界（为什么要约束 KL）：</strong></p>
+<div class="arithmatex">\[ J(\theta) - J(\theta_{\text{old}}) \;\ge\; \underbrace{J^{\text{CPI}}_{\pi_{\theta_{\text{old}}}}(\theta) - C\sqrt{\tfrac{1}{T}\sum_{t=0}^{T}\text{KL}\big(\pi_\theta(\cdot\mid s_t)\,\|\,\pi_{\theta_{\text{old}}}(\cdot\mid s_t)\big)}}_{\text{下界函数}} \]</div>
+<blockquote>
+<p>?? <strong>人话翻译</strong>：左边是我们真正想要"为正"的那个"进步量"。右边是一个<strong>能算的下界</strong>：替代目标减去一个"惩罚项"（新旧策略 KL 越大，惩罚越狠）。只要我们把<strong>右边</strong>顶到大于 0，左边的真实进步就<strong>保证</strong>大于 0——<strong>永不退步</strong>。最坏情况下令新策略=旧策略，惩罚和替代目标都为 0，至少不亏。这就是"单调改进"的数学保证。</p>
+</blockquote>
+<p><strong>最终的 PPO-Clip 目标（实战里真正用的）：</strong></p>
+<div class="arithmatex">\[ J(\theta)^{\text{ppo-clip}} = \mathbb{E}_{\tau\sim\pi_{\theta_{\text{old}}}}\!\left[\sum_{t=0}^{T}\min\!\Big(r_t(\theta)\,A_t,\;\text{clip}\big(r_t(\theta),\,1-\varepsilon,\,1+\varepsilon\big)\,A_t\Big)\right] \]</div>
+<p>其中 <span class="arithmatex">\(r_t(\theta)=\dfrac{\pi_\theta(a_t\mid s_t)}{\pi_{\theta_{\text{old}}}(a_t\mid s_t)}\)</span> 是新旧策略的概率比值。</p>
+<blockquote>
+<p>?? <strong>人话翻译</strong>：上面那个"KL 惩罚 + 硬约束"求解起来太贵（要算二阶导数的海森矩阵）。PPO 干脆耍了个滑头：<strong>直接把比值 <span class="arithmatex">\(r_t\)</span> 剪到 <span class="arithmatex">\([1-\varepsilon,\,1+\varepsilon]\)</span> 这个小区间里</strong>（<span class="arithmatex">\(\varepsilon\)</span> 常取 0.2）。比值一旦想跑出区间，<code>clip</code> 就把它摁住，再取个 <code>min</code> 取保守的那个——于是"更新别太猛"这个约束就被偷偷塞进了目标函数里。<span class="arithmatex">\(\varepsilon\)</span> 就是你能直接调的"安全带松紧"。</p>
+</blockquote>
+<div class="admonition warning">
+<p class="admonition-title">这也是 PPO 偶尔翻车的原因</p>
+<p>我们把"硬约束"换成了塞进目标里的"软约束"，约束就没那么铁了。所以 PPO 仍可能偶发训练退化——它是"工程上好用"的近似，不是"数学上铁保证"的版本。</p>
+</div>
+<details class="note">
+<summary>想看完整推导可跳过：性能差分 = 用新策略采样的优势和</summary>
+<p>要证明 <span class="arithmatex">\(J(\theta) - J(\theta_{\text{old}}) = \mathbb{E}_{\tau\sim\pi_\theta}\big[\sum_{t=0}^{T}\gamma^t A_t^{\pi_{\theta_{\text{old}}}}\big]\)</span>，从右边倒推，把优势按定义 <span class="arithmatex">\(A_t = R_t + \gamma V(S_{t+1}) - V(S_t)\)</span> 展开：</p>
+<div class="arithmatex">\[
+\begin{aligned}
+&amp;\mathbb{E}_{\tau\sim\pi_\theta}\Big[\textstyle\sum_t \gamma^t\big(R_t+\gamma V(S_{t+1})-V(S_t)\big)\Big]\\
+&amp;= \mathbb{E}_{\tau\sim\pi_\theta}\Big[\textstyle\sum_t \gamma^t R_t\Big] + \mathbb{E}_{\tau\sim\pi_\theta}\Big[\textstyle\sum_t \gamma^{t+1}V(S_{t+1}) - \sum_t \gamma^t V(S_t)\Big]\\
+&amp;= J(\theta) - \mathbb{E}_{\tau\sim\pi_\theta}[V(S_0)] = J(\theta) - J(\theta_{\text{old}})
+\end{aligned}
+\]</div>
+<p>中间那串价值函数的求和首尾相消（望远镜求和），只剩 <span class="arithmatex">\(-V(S_0)\)</span>；再用 <span class="arithmatex">\(V(S_0)=J(\theta_{\text{old}})\)</span> 收尾。</p>
+</details>
+<details class="note">
+<summary>想看完整推导可跳过：误差上界怎么来的</summary>
+<p>把真实差分和 CPI 替代目标都写成"对状态访问分布求和"的形式，两者只差在用的是新策略的访问分布 <span class="arithmatex">\(d_t^{\pi_\theta}\)</span> 还是旧策略的 <span class="arithmatex">\(d_t^{\pi_{\theta_{\text{old}}}}\)</span>。所以误差为</p>
+<div class="arithmatex">\[ \Delta = \sum_{t}\sum_s \big(d_t^{\pi_\theta}(s) - d_t^{\pi_{\theta_{\text{old}}}}(s)\big)\,g_{\pi_\theta}(s),\quad g_{\pi_\theta}(s):=\mathbb{E}_{a\sim\pi(\cdot|s)}[A_t^{\pi_{\theta_{\text{old}}}}] \]</div>
+<p>对有界函数用不等式 <span class="arithmatex">\(|\mathbb{E}_P[f]-\mathbb{E}_Q[f]|\le 2\|f\|_\infty D_{\text{TV}}(P,Q)\)</span>，得 <span class="arithmatex">\(|\Delta|\le 2\|g_{\pi_\theta}\|_\infty D_{\text{TV}}(d_t^{\pi_\theta}, d_t^{\pi_{\theta_{\text{old}}}})\)</span>。再用 Pinsker 不等式 <span class="arithmatex">\(D_{\text{TV}}(P,Q)\le\sqrt{\tfrac12 D_{\text{KL}}(P\parallel Q)}\)</span> 把 TV 换成 KL，就得到了正文里那个 <span class="arithmatex">\(\le C\sqrt{\overline{\text{KL}}}\)</span> 的上界。</p>
+</details>
+<h2 id="_4">?? 代码长什么样<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
+<p>重要性采样到底在干嘛，10 行就看穿（书里的例子）：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">x</span>  <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">])</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">pi</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.8</span><span class="p">])</span>   <span class="c1"># 新策略 P：真正想估的分布</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">b</span>  <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.2</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">,</span> <span class="mf">0.6</span><span class="p">])</span>   <span class="c1"># 旧策略 Q：手里数据来自它(越像 pi 方差越小)</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="n">samples</span> <span class="o">=</span> <span class="p">[]</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">100</span><span class="p">):</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">i</span>   <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">b</span><span class="p">),</span> <span class="n">p</span><span class="o">=</span><span class="n">b</span><span class="p">)</span>  <span class="c1"># 用旧策略 b 采样</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">rho</span> <span class="o">=</span> <span class="n">pi</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">/</span> <span class="n">b</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>                    <span class="c1"># 重要性权重 ρ = P/Q</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">samples</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">rho</span> <span class="o">*</span> <span class="n">x</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>            <span class="c1"># 折算后的值</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="nb">print</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">samples</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">var</span><span class="p">(</span><span class="n">samples</span><span class="p">))</span>  <span class="c1"># 均值≈真值2.7，方差随 b 接近 pi 而变小</span>
+</code></pre></div>
+<p>PPO-Clip 目标的核心，也就一行（伪代码）：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">ratio</span> <span class="o">=</span> <span class="n">exp</span><span class="p">(</span><span class="n">logp_new</span> <span class="o">-</span> <span class="n">logp_old</span><span class="p">)</span>               <span class="c1"># 新旧策略概率比值 r_t</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">clipped</span> <span class="o">=</span> <span class="n">clip</span><span class="p">(</span><span class="n">ratio</span><span class="p">,</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">eps</span><span class="p">,</span> <span class="mi">1</span> <span class="o">+</span> <span class="n">eps</span><span class="p">)</span>        <span class="c1"># 摁进 [1-ε, 1+ε]</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">loss</span> <span class="o">=</span> <span class="o">-</span><span class="nb">min</span><span class="p">(</span><span class="n">ratio</span> <span class="o">*</span> <span class="n">adv</span><span class="p">,</span> <span class="n">clipped</span> <span class="o">*</span> <span class="n">adv</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span> <span class="c1"># 取保守的那个，再最大化(所以加负号)</span>
+</code></pre></div>
+<h2 id="_5">??? 一图看懂<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
+<p>下面这张图串起本章的逻辑链——从"两个痛点"到"最终的 PPO"：</p>
+<pre class="mermaid"><code>flowchart TD
+    P1["痛点1: 更新太猛&lt;br/&gt;策略崩盘回不来"] --&gt; GOAL["目标: 单调改进&lt;br/&gt;(只升不降)"]
+    P2["痛点2: 旧数据&lt;br/&gt;用一次就扔"] --&gt; IS["重要性采样&lt;br/&gt;(借旧数据估新策略)"]
+    IS --&gt; SURR["替代目标 CPI&lt;br/&gt;(用新旧比值折算)"]
+    GOAL --&gt; SURR
+    SURR --&gt; ERR["但有误差: 状态访问&lt;br/&gt;分布会随策略漂移"]
+    ERR --&gt; KL["用 TV距离 + Pinsker&lt;br/&gt;换算成 KL 上界"]
+    KL --&gt; BOUND["下界函数 = 替代目标 - C√KL&lt;br/&gt;(顶到 大于0 就保证进步)"]
+    BOUND --&gt; HARD["硬约束: KL ≤ δ&lt;br/&gt;(置信域, 但要算海森矩阵太贵)"]
+    HARD --&gt; PPO["PPO-Clip&lt;br/&gt;把比值剪到 [1-ε, 1+ε]&lt;br/&gt;软约束, 简单好用"]</code></pre>
+<p>关于"<strong>状态访问分布会漂移</strong>"这个误差的根源，一张走廊图就懂：走廊 <code>A — B — C</code>，起点在 B。策略"总往左"会走出 <code>B→A→A→A…</code>，策略"总往右"走出 <code>B→C→C→C…</code>。<strong>两个策略只在 B 这一步的选择不同，之后看到的状态却完全不同。</strong> 这就是 RL 和普通监督学习的根本区别：<strong>策略不只决定当下动作，还决定了你未来会看到什么数据</strong>。新旧策略一旦差远了，它们走过的"风景"就对不上，替代目标的近似自然就不准了——所以要用 KL 把它们拴在一起。</p>
+<h2 id="take">?? 产品经理 take<a class="headerlink" href="#take" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>PPO 的全部精髓就一句话：小步快跑、绝不冒进。</strong> 它宁可慢一点、稳一点，也不愿意冒"一更新就崩盘"的风险。这正是它在 RLHF（用人类反馈训大模型）里成为默认选择的原因——训练一个大模型太贵，崩一次代价惊人，稳定压倒一切。</li>
+<li><strong>那个 <code>clip</code> 范围 <span class="arithmatex">\(\varepsilon\)</span>（默认 0.2）是你最该理解的旋钮</strong>：调小→更保守、更稳、学得慢；调大→更激进、学得快但更容易训练退化。它本质就是"安全带松紧"，对应着"新旧策略允许差多远"。</li>
+<li><strong>"复用旧数据"是有保质期的</strong>：重要性采样让旧数据能再用几轮，但用久了新旧策略越差越远、方差越来越大，数据就"馊"了。这解释了 PPO 里为什么旧数据只重复利用有限的几个 epoch，而不是无限复用。</li>
+<li><strong>理解了"状态访问分布漂移"，你就懂了 RL 为什么比监督学习难调</strong>：监督学习的数据分布是钉死的，RL 的数据分布会跟着策略一起变，是个移动靶。很多 RL 训练玄学，根子都在这。</li>
+<li><strong>PPO 不保证收敛到最优</strong>，只保证不退步。它可能卡在一个"再怎么调也不进步"的局部最优。产品上别指望"无脑多训就一定更好"。</li>
+</ul>
+<div class="admonition tip">
+<p class="admonition-title">一句话记住</p>
+<p>PPO = 用重要性采样复用旧数据 + 用 KL/裁剪把每步更新摁在"信任区间"里，换来"只升不降、绝不崩盘"的稳定训练。</p>
+</div>
+<p>?? <strong>上一章</strong>：<a href="../07-ppo-in-practice/">07 PPO 实战</a> ｜ <strong>下一章</strong>：<a href="../09-grpo/">09 GRPO：去掉评论家</a></p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+    <a href="https://github.com/kuzicode" target="_blank" rel="noopener" title="kuzicode 的 GitHub 主页" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.top", "navigation.indexes", "toc.follow", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../assets/javascripts/mathjax.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

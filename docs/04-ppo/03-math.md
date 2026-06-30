@@ -124,6 +124,7 @@ $$ J(\theta)^{\text{ppo-clip}} = \mathbb{E}_{\tau\sim\pi_{\theta_{\text{old}}}}\
 
 我们把"硬约束"换成了塞进目标里的"软约束"，约束就没那么铁了。所以 PPO 仍可能偶发训练退化——它是"工程上好用"的近似，不是"数学上铁保证"的版本。
 
+::: details
 想看完整推导可跳过：性能差分 = 用新策略采样的优势和
 
 要证明 $J(\theta) - J(\theta_{\text{old}}) = \mathbb{E}_{\tau\sim\pi_\theta}\big[\sum_{t=0}^{T}\gamma^t A_t^{\pi_{\theta_{\text{old}}}}\big]$，从右边倒推，把优势按定义 $A_t = R_t + \gamma V(S_{t+1}) - V(S_t)$ 展开：
@@ -138,6 +139,9 @@ $$
 
 中间那串价值函数的求和首尾相消（望远镜求和），只剩 $-V(S_0)$；再用 $V(S_0)=J(\theta_{\text{old}})$ 收尾。
 
+:::
+
+::: details
 想看完整推导可跳过：误差上界怎么来的
 
 把真实差分和 CPI 替代目标都写成"对状态访问分布求和"的形式，两者只差在用的是新策略的访问分布 $d_t^{\pi_\theta}$ 还是旧策略的 $d_t^{\pi_{\theta_{\text{old}}}}$。所以误差为
@@ -146,44 +150,29 @@ $$ \Delta = \sum_{t}\sum_s \big(d_t^{\pi_\theta}(s) - d_t^{\pi_{\theta_{\text{ol
 
 对有界函数用不等式 $|\mathbb{E}_P[f]-\mathbb{E}_Q[f]|\le 2\|f\|_\infty D_{\text{TV}}(P,Q)$，得 $|\Delta|\le 2\|g_{\pi_\theta}\|_\infty D_{\text{TV}}(d_t^{\pi_\theta}, d_t^{\pi_{\theta_{\text{old}}}})$。再用 Pinsker 不等式 $D_{\text{TV}}(P,Q)\le\sqrt{\tfrac12 D_{\text{KL}}(P\parallel Q)}$ 把 TV 换成 KL，就得到了正文里那个 $\le C\sqrt{\overline{\text{KL}}}$ 的上界。
 
+:::
+
 ## 💻 代码长什么样
 
 重要性采样到底在干嘛，10 行就看穿（书里的例子）：
 
-import numpy as np
-x  = np.array([1, 2, 3])
-pi = np.array([0.1, 0.1, 0.8])   # 新策略 P：真正想估的分布
-b  = np.array([0.2, 0.2, 0.6])   # 旧策略 Q：手里数据来自它(越像 pi 方差越小)
+```
 
-samples = []
-for _ in range(100):
-    i   = np.random.choice(len(b), p=b)  # 用旧策略 b 采样
-    rho = pi[i] / b[i]                    # 重要性权重 ρ = P/Q
-    samples.append(rho * x[i])            # 折算后的值
-
-print(np.mean(samples), np.var(samples))  # 均值≈真值2.7，方差随 b 接近 pi 而变小
+```
 
 PPO-Clip 目标的核心，也就一行（伪代码）：
 
-ratio = exp(logp_new - logp_old)               # 新旧策略概率比值 r_t
-clipped = clip(ratio, 1 - eps, 1 + eps)        # 摁进 [1-ε, 1+ε]
-loss = -min(ratio * adv, clipped * adv).mean() # 取保守的那个，再最大化(所以加负号)
+```
+
+```
 
 ## 🗺️ 一图看懂
 
 下面这张图串起本章的逻辑链——从"两个痛点"到"最终的 PPO"：
 
 ```
-flowchart TD
-    P1["痛点1: 更新太猛<br/>策略崩盘回不来"] --> GOAL["目标: 单调改进<br/>(只升不降)"]
-    P2["痛点2: 旧数据<br/>用一次就扔"] --> IS["重要性采样<br/>(借旧数据估新策略)"]
-    IS --> SURR["替代目标 CPI<br/>(用新旧比值折算)"]
-    GOAL --> SURR
-    SURR --> ERR["但有误差: 状态访问<br/>分布会随策略漂移"]
-    ERR --> KL["用 TV距离 + Pinsker<br/>换算成 KL 上界"]
-    KL --> BOUND["下界函数 = 替代目标 - C√KL<br/>(顶到 大于0 就保证进步)"]
-    BOUND --> HARD["硬约束: KL ≤ δ<br/>(置信域, 但要算海森矩阵太贵)"]
-    HARD --> PPO["PPO-Clip<br/>把比值剪到 [1-ε, 1+ε]<br/>软约束, 简单好用"]
+
+```
 
 关于"状态访问分布会漂移"这个误差的根源，一张走廊图就懂：走廊 A — B — C，起点在 B。策略"总往左"会走出 B→A→A→A…，策略"总往右"走出 B→C→C→C…。两个策略只在 B 这一步的选择不同，之后看到的状态却完全不同。 这就是 RL 和普通监督学习的根本区别：策略不只决定当下动作，还决定了你未来会看到什么数据。新旧策略一旦差远了，它们走过的"风景"就对不上，替代目标的近似自然就不准了——所以要用 KL 把它们拴在一起。
 
