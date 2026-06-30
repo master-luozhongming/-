@@ -1,0 +1,22 @@
+{
+  "name": "reinforcement-learning-tutorial",
+  "version": "1.0.0",
+  "description": "强化学习与大模型教程 - 知识蒸馏",
+  "scripts": {
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
+  },
+  "keywords": [
+    "reinforcement-learning",
+    "deep-learning",
+    "ppo",
+    "grpo",
+    "llm"
+  ],
+  "author": "master-luozhongming",
+  "license": "MIT",
+  "devDependencies": {
+    "vitepress": "^1.0.0"
+  }
+}
