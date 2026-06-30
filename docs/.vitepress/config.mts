@@ -4,6 +4,7 @@ export default defineConfig({
   title: "强化学习与大模型教程",
   description: "理论与实践 - 知识蒸馏",
   lang: 'zh-CN',
+  base: '/-/',
 
   // 忽略其他有问题的目录
   srcExclude: ['**/align/**', '**/mm/**', '**/tools/**'],
