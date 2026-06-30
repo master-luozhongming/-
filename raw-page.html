@@ -1,0 +1,2031 @@
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="把 407 页满是公式和代码的 AI 教程，翻译成产品经理和新人也能看懂的大白话">
+      
+      
+        <meta name="author" content="左元（原著）· 大白话重写">
+      
+      
+      
+        <link rel="prev" href="../04-rl-intro/">
+      
+      
+        <link rel="next" href="../06-ppo/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/favicon.svg">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>05 策略梯度法 - Modelshit Class</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Geist:300,300i,400,400i,700,700i%7CGeist+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Geist";--md-code-font:"Geist Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#05" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href="../.." title="Modelshit Class" class="md-header__button md-logo" aria-label="Modelshit Class" data-md-component="logo">
+      
+  <img src="../../assets/logo.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Modelshit Class
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              05 策略梯度法
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="indigo"  aria-label="切换到暗色模式"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="切换到暗色模式" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="indigo"  aria-label="切换到亮色模式"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="切换到亮色模式" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="搜索" placeholder="搜索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="查找">
+        
+        <button type="reset" class="md-search__icon md-icon" title="清空当前内容" aria-label="清空当前内容" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            正在初始化搜索引擎
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/kuzicode" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    kuzicode
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Modelshit Class" class="md-nav__button md-logo" aria-label="Modelshit Class" data-md-component="logo">
+      
+  <img src="../../assets/logo.svg" alt="logo">
+
+    </a>
+    Modelshit Class
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/kuzicode" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    kuzicode
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    首页
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    第一部分 · 基础与大语言模型
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    第一部分 · 基础与大语言模型
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00-foundations/01-microgpt/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    01 microGPT：60 行看懂大模型全貌
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00-foundations/02-llm-intro/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    02 大模型在干嘛：预测下一个词
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../00-foundations/03-gpt2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    03 GPT-2：把 Transformer 拆开看
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    第二部分 · 强化学习
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    第二部分 · 强化学习
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../04-rl-intro/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    04 强化学习是什么
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    05 策略梯度法
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    05 策略梯度法
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ?? 先讲个直觉
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ?? 核心概念（说人话）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="?? 核心概念（说人话）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ① 策略（Policy）—— 智能体的"决策习惯"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-trajectory-return" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ② 轨迹与回报（Trajectory &amp; Return）—— "一整局"和"这局的总分"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-objective" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ③ 目标函数（Objective）—— 我们到底想最大化什么
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-gradient-ascent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ④ 梯度上升（Gradient Ascent）—— 朝"更高分"的方向拧参数
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ⑤ 一个绕不开的麻烦：期望算不出来
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ?? 必要的公式
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="?? 必要的公式">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        第 1 代：原始策略梯度——所有动作共用一个权重
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-reinforce" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        第 2 代：REINFORCE——别把"过去的分"算进来
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-baseline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        第 3 代：带基线（Baseline）——给分数找个"及格线"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-actor-critic-" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        第 4 代：Actor-Critic（演员-评论家）——边玩边学，不用等整局结束
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-gae" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        第 5 代：GAE（广义优势估计）——在"偏"和"抖"之间调一个旋钮
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ?? 代码长什么样
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ??? 一图看懂
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#take" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ?? 产品经理 take
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../06-ppo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    06 PPO：稳一点的策略更新
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../07-ppo-in-practice/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    07 PPO 实战
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../08-ppo-math/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    08 PPO 背后的数学
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../09-grpo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    09 GRPO：去掉评论家
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    第三部分 · 大模型对齐与微调
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    第三部分 · 大模型对齐与微调
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../02-rlhf/10-llm-training-overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    10 大模型训练全流程
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../02-rlhf/11-dpo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    11 DPO：不用强化学习也能对齐
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../02-rlhf/12-ppo-instructgpt/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    12 用 PPO 复刻 InstructGPT
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../02-rlhf/13-grpo-deepseek-r1/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    13 用 GRPO 复刻 DeepSeek-R1
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    第四部分 · 多模态
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    第四部分 · 多模态
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../03-multimodal/14-vit/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    14 Vision Transformer
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../03-multimodal/15-clip/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    15 CLIP：让图文站到同一空间
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../03-multimodal/16-clipcap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    16 ClipCap：看图说话
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../03-multimodal/17-diffusion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    17 扩散模型：从噪声里画画
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../03-multimodal/18-diffusion-math/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    18 扩散模型背后的数学
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../03-multimodal/19-conditional-diffusion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    19 条件扩散：让它画我想要的
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../03-multimodal/20-dalle2/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    20 DALL-E 2：文生图全家桶
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    附录
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    附录
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../99-appendix/21-summary/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    21 全书总结
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../99-appendix/A-uv/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    A uv：Python 环境管理
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ?? 先讲个直觉
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ?? 核心概念（说人话）
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="?? 核心概念（说人话）">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ① 策略（Policy）—— 智能体的"决策习惯"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-trajectory-return" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ② 轨迹与回报（Trajectory &amp; Return）—— "一整局"和"这局的总分"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-objective" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ③ 目标函数（Objective）—— 我们到底想最大化什么
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-gradient-ascent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ④ 梯度上升（Gradient Ascent）—— 朝"更高分"的方向拧参数
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ⑤ 一个绕不开的麻烦：期望算不出来
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ?? 必要的公式
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="?? 必要的公式">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        第 1 代：原始策略梯度——所有动作共用一个权重
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-reinforce" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        第 2 代：REINFORCE——别把"过去的分"算进来
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-baseline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        第 3 代：带基线（Baseline）——给分数找个"及格线"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-actor-critic-" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        第 4 代：Actor-Critic（演员-评论家）——边玩边学，不用等整局结束
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-gae" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        第 5 代：GAE（广义优势估计）——在"偏"和"抖"之间调一个旋钮
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ?? 代码长什么样
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ??? 一图看懂
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#take" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ?? 产品经理 take
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="05">05 策略梯度法<a class="headerlink" href="#05" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p>?? <strong>一句话导读</strong>：上一章我们知道了"强化学习要训练一个会做决策的智能体"，但<strong>到底怎么训</strong>？这一章给出最主流的一条路线——<strong>策略梯度法（Policy Gradient，说人话就是"直接调整'做决策的那张网'，让它越来越倾向于做能拿高分的动作"）</strong>。我们会顺着一条改进链走下来：原始策略梯度 → REINFORCE → 带基线 → Actor-Critic → 多步 TD → GAE，每一步都只解决上一步的一个毛病。看完你就能看懂 ChatGPT 后训练里 RLHF、PPO、GRPO 这些词到底在折腾什么。</p>
+</blockquote>
+<h2 id="_1">?? 先讲个直觉<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
+<p>想象你在带一个新手玩"顶杆子"游戏（推一辆小车，让车上的杆子别倒，这就是经典的<strong>倒立摆 / CartPole</strong> 环境）。</p>
+<p>新手脑子里有一套"看到什么情况就往哪推"的<strong>直觉</strong>，但一开始这套直觉是瞎蒙的。你要怎么教他变强？</p>
+<p>最朴素的办法是这样：<strong>让他放手玩一整局，记下他这一局得了多少分。</strong></p>
+<ul>
+<li>如果这一局打得<strong>好</strong>（分高）：你就跟他说"你刚才那一连串操作，整体不错，<strong>以后多这么干</strong>"。</li>
+<li>如果这一局打得<strong>差</strong>（分低）：你就说"刚才那套，<strong>以后少这么干</strong>"。</li>
+</ul>
+<p>注意，你<strong>没有</strong>告诉他"第 37 步你应该往左而不是往右"——因为你也不知道标准答案。你只是根据<strong>最终结果</strong>，把他"做过的所有动作"整体地往上推或往下压一点点。玩几千局之后，那些能带来高分的动作出现得越来越频繁，他就变强了。</p>
+<p><strong>策略梯度法干的就是这件事</strong>：</p>
+<ul>
+<li>"新手脑子里的直觉" = 一个神经网络（叫<strong>策略网络</strong>）；</li>
+<li>"往上推 / 往下压一点点" = 用梯度去微调这个网络的参数；</li>
+<li>"这一局得了多少分" = 回报（Return）。</li>
+</ul>
+<p>这一章剩下的全部内容，都是在回答同一个问题：<strong>"往上推 / 往下压"这个力度，到底该用什么数字来算才最靠谱？</strong> 你会看到 5 个版本的答案，一个比一个聪明。</p>
+<h2 id="_2">?? 核心概念（说人话）<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
+<h3 id="1-policy">① 策略（Policy）—— 智能体的"决策习惯"<a class="headerlink" href="#1-policy" title="Permanent link">&para;</a></h3>
+<p><strong>人话定义</strong>：策略就是"在某个状态下，该做什么动作"的规则。我们写成 <span class="arithmatex">\(\pi(a\mid s)\)</span>，读作"在状态 <span class="arithmatex">\(s\)</span> 下，做动作 <span class="arithmatex">\(a\)</span> 的概率"。</p>
+<p>为什么用概率而不是"铁板钉钉做某个动作"？因为要<strong>留点探索空间</strong>——偶尔试试别的动作，才知道是不是有更好的选择。</p>
+<p>在倒立摆里，策略网络的输入是 4 个数字（车的位置、车的速度、杆的角度、杆的角速度），输出是两个动作的概率，比如"向左推 0.7、向右推 0.3"。我们用 <span class="arithmatex">\(\theta\)</span>（theta）代表这张网里所有可调的参数，把它写成 <span class="arithmatex">\(\pi_\theta(a\mid s)\)</span>。</p>
+<blockquote>
+<p>把强化学习想成一个<strong>分类问题</strong>会很好理解：输入是状态，输出是"该选哪个动作类"。区别只在于——图像分类有人给你标好的标准答案，而强化学习的"标准答案"得靠智能体<strong>自己玩、自己采样</strong>出来。</p>
+</blockquote>
+<h3 id="2-trajectory-return">② 轨迹与回报（Trajectory &amp; Return）—— "一整局"和"这局的总分"<a class="headerlink" href="#2-trajectory-return" title="Permanent link">&para;</a></h3>
+<p><strong>轨迹（Trajectory）</strong>：玩一整局产生的一串"状态—动作—奖励"序列，记作 <span class="arithmatex">\(\tau\)</span>（tau）。</p>
+<p><strong>回报（Return）</strong>：这一局的总得分，记作 <span class="arithmatex">\(G\)</span>。但它不是简单加总，而是<strong>越靠后的奖励打越多折扣</strong>（乘上 <span class="arithmatex">\(\gamma\)</span> 的若干次方，<span class="arithmatex">\(\gamma\)</span> 是 0~1 的<strong>折扣因子</strong>）。直觉就是"眼前的奖励比遥远的奖励更实在"。</p>
+<h3 id="3-objective">③ 目标函数（Objective）—— 我们到底想最大化什么<a class="headerlink" href="#3-objective" title="Permanent link">&para;</a></h3>
+<p>我们想要的是：<strong>让"平均每一局的总分"尽量高</strong>。注意是"平均"——因为策略带随机性，每局分数都在抖，我们要的是<strong>期望</strong>（多玩很多局的平均值）。这个"平均总分"就是目标函数 <span class="arithmatex">\(J(\theta)\)</span>。</p>
+<h3 id="4-gradient-ascent">④ 梯度上升（Gradient Ascent）—— 朝"更高分"的方向拧参数<a class="headerlink" href="#4-gradient-ascent" title="Permanent link">&para;</a></h3>
+<p>训练神经网络时我们一般让"损失最小"，用<strong>梯度下降</strong>。但这里我们要让"总分最大"，所以反过来用<strong>梯度上升</strong>：算出"参数往哪个方向拧能让总分变大"，然后就往那个方向拧一点点。方向和力度，都由<strong>梯度</strong> <span class="arithmatex">\(\nabla_\theta J(\theta)\)</span> 给出。</p>
+<h3 id="5">⑤ 一个绕不开的麻烦：期望算不出来<a class="headerlink" href="#5" title="Permanent link">&para;</a></h3>
+<p>目标函数是个期望（所有可能轨迹的加权平均）。可倒立摆能玩 200 步，不同轨迹的数量是个天文数字（约 <span class="arithmatex">\(2^{200}\)</span>），根本没法把每条都算一遍。</p>
+<p><strong>怎么办？靠"大数定律"——多采样几局，拿这几局的平均值去近似真实的期望。</strong> 这就是后面所有算法都在"采样—估算"的根本原因。</p>
+<h2 id="_3">?? 必要的公式<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
+<p>整章其实只有<strong>一个母公式</strong>，剩下全是它的变种。先看母公式。</p>
+<div class="arithmatex">\[ \nabla_\theta J(\theta) = \mathbb{E}_{\tau\sim\pi_\theta}\!\left[\sum_{t=0}^{T} \Phi_t \,\nabla_\theta \log \pi_\theta(A_t\mid S_t)\right] \]</div>
+<blockquote>
+<p>?? <strong>人话翻译</strong>：想让策略变好，就对这一局里<strong>每一步</strong>做一件事——把"做了当时那个动作的概率"往上抬（这就是 <span class="arithmatex">\(\nabla_\theta \log \pi_\theta(A_t\mid S_t)\)</span>，可以读成"让 <span class="arithmatex">\(A_t\)</span> 这个动作更可能被选中的拧法"），抬多用力，由前面的<strong>权重 <span class="arithmatex">\(\Phi_t\)</span></strong> 说了算。
+- <span class="arithmatex">\(\Phi_t\)</span> 是正的大数 → 使劲往上抬（"这动作好，多做"）；
+- <span class="arithmatex">\(\Phi_t\)</span> 是负数 → 反着压下去（"这动作差，少做"）。</p>
+<p><strong>本章 5 个算法的唯一区别，就是 <span class="arithmatex">\(\Phi_t\)</span> 用什么。</strong> 记住这句话，这一章就通了一半。</p>
+</blockquote>
+<p>那 <span class="arithmatex">\(\Phi_t\)</span> 到底怎么填？这就是五代算法的进化史：</p>
+<table>
+<thead>
+<tr>
+<th>版本</th>
+<th><span class="arithmatex">\(\Phi_t\)</span> 用什么</th>
+<th>解决了上一版什么毛病</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1. 原始策略梯度</td>
+<td>整局总分 <span class="arithmatex">\(G(\tau)\)</span></td>
+<td>—（起点）</td>
+</tr>
+<tr>
+<td>2. REINFORCE</td>
+<td>从当前这步往后的分 <span class="arithmatex">\(G_t\)</span></td>
+<td>别把"做动作前就已经拿到的分"算进来（那是噪声）</td>
+</tr>
+<tr>
+<td>3. 带基线</td>
+<td><span class="arithmatex">\(G_t - b(S_t)\)</span></td>
+<td>全是正分时也能分出"比平均好"还是"比平均差"</td>
+</tr>
+<tr>
+<td>4. Actor-Critic</td>
+<td><span class="arithmatex">\(R_t + \gamma V(S_{t+1}) - V(S_t)\)</span></td>
+<td>不用等整局结束，走一步就能学</td>
+</tr>
+<tr>
+<td>5. GAE</td>
+<td>多步 TD 的加权平均 <span class="arithmatex">\(A_t^{\text{GAE}}\)</span></td>
+<td>在"偏差"和"抖动"之间找平衡</td>
+</tr>
+</tbody>
+</table>
+<p>下面把这五代逐个讲清"它为什么出现"。</p>
+<h3 id="1">第 1 代：原始策略梯度——所有动作共用一个权重<a class="headerlink" href="#1" title="Permanent link">&para;</a></h3>
+<p>最朴素的版本：<span class="arithmatex">\(\Phi_t = G(\tau)\)</span>，也就是<strong>这一局所有动作，都用"整局总分"这同一个权重去抬/压</strong>。</p>
+<p>这正是开头那个"放手玩一局、根据总分整体调"的直觉。它能用，但毛病明显：如果某局总分特别高（比如 <span class="arithmatex">\(G=10000\)</span>），更新步子会大到离谱，把策略一把拽崩——<strong>这叫策略崩溃</strong>。好比一个人突然中了一千万，整个人的行为模式直接被这一次巨大奖励带跑偏了。</p>
+<details class="note">
+<summary>想看策略梯度定理的推导（可跳过）</summary>
+<p>目标函数 <span class="arithmatex">\(J(\theta)=\mathbb{E}_{\tau\sim\pi_\theta}[G(\tau)]\)</span>，难点在于"期望里带着参数 <span class="arithmatex">\(\theta\)</span>，没法直接求导"。推导的关键是一个叫 <strong>log 梯度技巧</strong> 的恒等式：</p>
+<div class="arithmatex">\[ \nabla_\theta P(\tau\mid\theta) = P(\tau\mid\theta)\,\nabla_\theta \log P(\tau\mid\theta) \]</div>
+<p>它来自最基础的求导规则 <span class="arithmatex">\((\log f)' = f'/f\)</span>。把期望展开成求和、把梯度挪进求和号、用积的微分法则（注意 <span class="arithmatex">\(\nabla_\theta G(\tau)=0\)</span>，因为回报由环境决定、与 <span class="arithmatex">\(\theta\)</span> 无关），再套上这个技巧，就得到：</p>
+<div class="arithmatex">\[ \nabla_\theta J(\theta) = \mathbb{E}_{\tau\sim\pi_\theta}[G(\tau)\nabla_\theta \log P(\tau\mid\theta)] \]</div>
+<p>而一条轨迹的概率 <span class="arithmatex">\(P(\tau\mid\theta)=p(S_0)\prod_t \pi_\theta(A_t\mid S_t)\,p(S_{t+1}\mid S_t,A_t)\)</span>，取对数后变成一串加法。其中只有 <span class="arithmatex">\(\pi_\theta\)</span> 那几项含 <span class="arithmatex">\(\theta\)</span>，环境转移概率 <span class="arithmatex">\(p(\cdot)\)</span> 对 <span class="arithmatex">\(\theta\)</span> 求导全是 0，于是：</p>
+<div class="arithmatex">\[ \nabla_\theta \log P(\tau\mid\theta) = \sum_{t=0}^{T}\nabla_\theta \log \pi_\theta(A_t\mid S_t) \]</div>
+<p>代回去就是母公式（<span class="arithmatex">\(\Phi_t=G(\tau)\)</span> 的版本）。</p>
+</details>
+<h3 id="2-reinforce">第 2 代：REINFORCE——别把"过去的分"算进来<a class="headerlink" href="#2-reinforce" title="Permanent link">&para;</a></h3>
+<p>毛病：第 1 代里，第 <span class="arithmatex">\(t\)</span> 步动作的权重 <span class="arithmatex">\(G(\tau)\)</span> 包含了<strong>整局</strong>的分，连"做这步之前就已经拿到的分"都算进去了。可是——<strong>你这一步动作，不可能改变已经发生的过去</strong>。把过去的分掺进来，纯属噪声，让训练抖得厉害。</p>
+<p>修法：第 <span class="arithmatex">\(t\)</span> 步只用"从这步往后"的回报，记作 <span class="arithmatex">\(G_t\)</span>（专业叫法是 <strong>reward-to-go</strong>，剩余回报）。</p>
+<div class="arithmatex">\[ \Phi_t = G_t = R_t + \gamma R_{t+1} + \cdots + \gamma^{T-t}R_T \]</div>
+<blockquote>
+<p>?? <strong>人话翻译</strong>：评价"第 37 步走得好不好"，只看第 37 步<strong>之后</strong>赚了多少，之前的账一笔勾销。这就是 REINFORCE。</p>
+</blockquote>
+<p>效果：<strong>不影响正确性（仍然无偏），但方差更小</strong>——训练更稳、更快。</p>
+<details class="note">
+<summary>想看'砍掉过去回报'为什么不改变结果（可跳过）</summary>
+<p>把整局回报拆成"过去 + 未来"两段：<span class="arithmatex">\(G(\tau)=G_{&lt;t}+G_{\ge t}\)</span>。要证明过去那段在期望下对梯度的贡献为 0：</p>
+<p>给定到时刻 <span class="arithmatex">\(t\)</span> 的历史 <span class="arithmatex">\(H_t\)</span> 后，<span class="arithmatex">\(G_{&lt;t}\)</span> 已经是确定值，可以提到期望外面，只剩：</p>
+<div class="arithmatex">\[ \mathbb{E}[\nabla_\theta \log \pi_\theta(A_t\mid S_t)\mid H_t] = \sum_a \pi_\theta(a\mid S_t)\nabla_\theta \log \pi_\theta(a\mid S_t) = \sum_a \nabla_\theta \pi_\theta(a\mid S_t) \]</div>
+<p>（中间用了 log 梯度技巧 <span class="arithmatex">\(\pi\nabla\log\pi=\nabla\pi\)</span>）。而所有动作概率加起来恒等于 1，对常数 1 求导是 0：</p>
+<div class="arithmatex">\[ \sum_a \nabla_\theta \pi_\theta(a\mid S_t) = \nabla_\theta \sum_a \pi_\theta(a\mid S_t) = \nabla_\theta 1 = 0 \]</div>
+<p>所以过去回报项的期望是 0，删掉它不引入偏差，只减少方差。这就是著名的 <strong>"reward-to-go" / 因果性技巧</strong>。</p>
+</details>
+<h3 id="3-baseline">第 3 代：带基线（Baseline）——给分数找个"及格线"<a class="headerlink" href="#3-baseline" title="Permanent link">&para;</a></h3>
+<p>毛病：在倒立摆里，只要杆没倒，每步奖励都是 <strong>+1</strong>，所以 <span class="arithmatex">\(G_t\)</span> <strong>永远是正的</strong>。这意味着：不管动作好坏，我们<strong>都在抬高它的概率</strong>，只是抬多抬少的区别。这很蠢——差动作也该被压下去才对。</p>
+<p>修法：减去一个<strong>基线 <span class="arithmatex">\(b(S_t)\)</span></strong>，把"绝对分"变成"相对分"：</p>
+<div class="arithmatex">\[ \Phi_t = G_t - b(S_t) \]</div>
+<blockquote>
+<p>?? <strong>人话翻译</strong>：别看你考了多少分，看你<strong>比平均水平高还是低</strong>。比平均好（正）→ 抬概率；比平均差（负）→ 压概率。基线就是那条"及格线 / 平均线"。</p>
+</blockquote>
+<p>基线可以是任意只跟状态有关的函数，实践中最常用的就是<strong>价值函数 <span class="arithmatex">\(V(S_t)\)</span></strong>（"在这个状态下，预期还能拿多少分"）。</p>
+<p>举个例子：杆已经歪到必倒的状态，不管你怎么推，3 步后都得倒。这时 <span class="arithmatex">\(G_t=3\)</span>，没基线的话还会傻乎乎地抬高当前动作概率；但价值函数早看穿了"这状态就值 3 分"，于是 <span class="arithmatex">\(G_t - V(S_t)=0\)</span>，权重为 0——<strong>不瞎调，省掉无谓的训练</strong>。</p>
+<details class="note">
+<summary>想看'减基线为什么不引入偏差'（可跳过）</summary>
+<p>核心是这个恒等式（对任意参数化概率分布都成立）：</p>
+<div class="arithmatex">\[ \mathbb{E}_{A_t\sim\pi_\theta}[\nabla_\theta \log \pi_\theta(A_t\mid S_t)] = 0 \]</div>
+<p>因为 <span class="arithmatex">\(b(S_t)\)</span> 只跟状态有关、与动作 <span class="arithmatex">\(A_t\)</span> 无关，可以提出来，于是：</p>
+<div class="arithmatex">\[ \mathbb{E}_{A_t\sim\pi_\theta}[b(S_t)\nabla_\theta \log \pi_\theta(A_t\mid S_t)] = b(S_t)\cdot 0 = 0 \]</div>
+<p>所以减去基线那一项期望为 0，梯度的期望值不变（无偏），但方差能显著变小。注意：不能把 <span class="arithmatex">\(G_t\)</span> 也这样"提出来"，因为 <span class="arithmatex">\(G_t\)</span> 是随 <span class="arithmatex">\(A_t\)</span> 变化的，那一项不为 0。</p>
+</details>
+<h3 id="4-actor-critic-">第 4 代：Actor-Critic（演员-评论家）——边玩边学，不用等整局结束<a class="headerlink" href="#4-actor-critic-" title="Permanent link">&para;</a></h3>
+<p>毛病：前面要算 <span class="arithmatex">\(G_t\)</span>，必须<strong>等一整局玩完</strong>才知道"从这步往后总共赚了多少"。一局没结束，策略和价值网络都动不了。慢。</p>
+<p>修法：用<strong>时序差分（TD，Temporal Difference）</strong>——只往前看一步，用价值网络的预测来"补全"未来：</p>
+<div class="arithmatex">\[ \Phi_t = \underbrace{R_t + \gamma V_\omega(S_{t+1})}_{\text{走一步看到的}+\text{对未来的估计}} - \underbrace{V_\omega(S_t)}_{\text{原本的估计}} = \delta_t \]</div>
+<blockquote>
+<p>?? <strong>人话翻译</strong>：原本要等到局终才知道"这步好不好"；现在改成——<strong>走一步，拿"实际拿到的 <span class="arithmatex">\(R_t\)</span> + 对下一步的估值"去对比"原来的估值"</strong>。如果实际比预期好（<span class="arithmatex">\(\delta_t&gt;0\)</span>），说明这动作不错。这个差值 <span class="arithmatex">\(\delta_t\)</span> 叫 <strong>1 步 TD 误差</strong>。</p>
+</blockquote>
+<p>这里出现了两张网，正是 "演员-评论家" 名字的由来：</p>
+<ul>
+<li><strong>Actor（演员）= 策略网络 <span class="arithmatex">\(\pi_\theta\)</span></strong>：负责做动作。</li>
+<li><strong>Critic（评论家）= 价值网络 <span class="arithmatex">\(V_\omega\)</span></strong>：负责打分点评。</li>
+</ul>
+<p>两张网同时训练：评论家努力让自己的估值 <span class="arithmatex">\(V_\omega(S_t)\)</span> 逼近"实际看到的 <span class="arithmatex">\(R_t+\gamma V_\omega(S_{t+1})\)</span>"（用均方误差当损失）；演员则听评论家的点评 <span class="arithmatex">\(\delta_t\)</span> 来调整自己。</p>
+<blockquote>
+<p>?? 这里有个权衡：评论家 <span class="arithmatex">\(V_\omega\)</span> 是个还没训好的神经网络，它的估计<strong>可能有偏差</strong>。所以 Actor-Critic 拿"少抖动（方差小、能单步更新）"换来了"可能有点偏（有偏差）"。这正引出了下一代要解决的问题。</p>
+</blockquote>
+<h3 id="5-gae">第 5 代：GAE（广义优势估计）——在"偏"和"抖"之间调一个旋钮<a class="headerlink" href="#5-gae" title="Permanent link">&para;</a></h3>
+<p>毛病：第 4 代只看 1 步（<span class="arithmatex">\(\delta_t\)</span>），<strong>估得稳但偏</strong>；而 REINFORCE 那种看到底（<span class="arithmatex">\(G_t\)</span>），<strong>没偏但抖</strong>。能不能要个中间档，甚至给个旋钮自由调？</p>
+<p>先看"看几步"的家族（多步 TD 误差），看的步数越多，越接近真实回报、偏差越小，但抖动越大：</p>
+<div class="arithmatex">\[ A_t^{(k)} = \sum_{l=0}^{k-1}\gamma^l \delta_{t+l} \]</div>
+<blockquote>
+<p>?? <strong>人话翻译</strong>：<span class="arithmatex">\(A_t^{(1)}\)</span> 只看 1 步，<span class="arithmatex">\(A_t^{(2)}\)</span> 看 2 步……看得越多越接近"真账"，但也越受运气干扰。</p>
+</blockquote>
+<p><strong>GAE（Generalized Advantage Estimation，广义优势估计）</strong> 的做法很聪明：不选某一个 <span class="arithmatex">\(k\)</span>，而是把"看 1 步、看 2 步、看 3 步……"的结果做<strong>指数加权平均</strong>，用一个超参数 <span class="arithmatex">\(\lambda\)</span>（0~1）当旋钮：</p>
+<div class="arithmatex">\[ A_t^{\text{GAE}} = \sum_{l=0}^{\infty}(\gamma\lambda)^l \,\delta_{t+l} \]</div>
+<blockquote>
+<p>?? <strong>人话翻译</strong>：<span class="arithmatex">\(\lambda\)</span> 是"偏差—方差"调节旋钮。
+- <span class="arithmatex">\(\lambda=0\)</span>：退化成只看 1 步（= Actor-Critic，稳但偏）；
+- <span class="arithmatex">\(\lambda=1\)</span>：退化成看到底（= 蒙特卡洛，准但抖）；
+- 中间值（实践常用 0.95）：两头的好处都沾一点。</p>
+</blockquote>
+<p>实现上有个超好用的<strong>递推公式</strong>（从后往前算，一遍搞定）：</p>
+<div class="arithmatex">\[ A_t^{\text{GAE}} = \delta_t + \gamma\lambda\, A_{t+1}^{\text{GAE}} \]</div>
+<blockquote>
+<p>?? <strong>人话翻译</strong>：从最后一步往回倒着扫一遍，每步的优势 = 本步 TD 误差 + 打折后的"后一步优势"。这就是 PPO、GRPO 等现代算法里真正在跑的那行代码。</p>
+</blockquote>
+<p>至此，母公式里的 <span class="arithmatex">\(\Phi_t\)</span> 也常被统称为<strong>优势函数（Advantage Function，<span class="arithmatex">\(A(s,a)\)</span>）</strong>——衡量"在状态 <span class="arithmatex">\(s\)</span> 下做动作 <span class="arithmatex">\(a\)</span>，比平均水平好多少"。<strong>强化学习里大量的花活儿，本质都是在改进这个 <span class="arithmatex">\(\Phi_t\)</span> 怎么算。</strong></p>
+<h2 id="_4">?? 代码长什么样<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
+<p>先看最朴素的策略网络（一张 4→128→2 的小网，输出两个动作的概率）：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">PolicyNet</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>           <span class="c1"># 演员：决定做什么动作</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">action_size</span><span class="p">):</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">l1</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">128</span><span class="p">)</span>   <span class="c1"># 输入：倒立摆状态的 4 个数字</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">l2</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">128</span><span class="p">,</span> <span class="n">action_size</span><span class="p">)</span>  <span class="c1"># 输出：每个动作一个分</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>        <span class="n">x</span> <span class="o">=</span> <span class="n">F</span><span class="o">.</span><span class="n">relu</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">l1</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>        <span class="k">return</span> <span class="n">F</span><span class="o">.</span><span class="n">softmax</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">l2</span><span class="p">(</span><span class="n">x</span><span class="p">),</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>  <span class="c1"># softmax 把分数变成概率</span>
+</code></pre></div>
+<p>再看进化的核心——<strong>Actor-Critic 的一次更新</strong>（多了一张价值网 <code>self.v</code>，单步即可更新）：</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">update</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">,</span> <span class="n">action_prob</span><span class="p">,</span> <span class="n">reward</span><span class="p">,</span> <span class="n">next_state</span><span class="p">,</span> <span class="n">done</span><span class="p">):</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="c1"># ① 评论家：让 V(S_t) 逼近 &quot;R_t + γ·V(S_{t+1})&quot;</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="n">target</span> <span class="o">=</span> <span class="n">reward</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">gamma</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">v</span><span class="p">(</span><span class="n">next_state</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">done</span><span class="p">)</span>  <span class="c1"># TD 目标</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="n">v</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">v</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>                                <span class="c1"># 原本的估值 V(S_t)</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">loss_v</span> <span class="o">=</span> <span class="n">F</span><span class="o">.</span><span class="n">mse_loss</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">target</span><span class="o">.</span><span class="n">detach</span><span class="p">())</span>          <span class="c1"># 估值与目标的均方差</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="c1"># ② 演员：用 TD 误差 δ 当权重，调整动作概率</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    <span class="n">delta</span> <span class="o">=</span> <span class="p">(</span><span class="n">target</span> <span class="o">-</span> <span class="n">v</span><span class="p">)</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span>                    <span class="c1"># δ = R_t + γV(S_{t+1}) ? V(S_t)</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    <span class="n">loss_pi</span> <span class="o">=</span> <span class="o">-</span><span class="n">torch</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">action_prob</span><span class="p">)</span> <span class="o">*</span> <span class="n">delta</span>        <span class="c1"># 母公式里的 Φ_t = δ</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>    <span class="c1"># 两张网各自反向传播、各自更新</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">optimizer_v</span><span class="o">.</span><span class="n">zero_grad</span><span class="p">();</span> <span class="n">loss_v</span><span class="o">.</span><span class="n">backward</span><span class="p">();</span>  <span class="bp">self</span><span class="o">.</span><span class="n">optimizer_v</span><span class="o">.</span><span class="n">step</span><span class="p">()</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">optimizer_pi</span><span class="o">.</span><span class="n">zero_grad</span><span class="p">();</span> <span class="n">loss_pi</span><span class="o">.</span><span class="n">backward</span><span class="p">();</span> <span class="bp">self</span><span class="o">.</span><span class="n">optimizer_pi</span><span class="o">.</span><span class="n">step</span><span class="p">()</span>
+</code></pre></div>
+<blockquote>
+<p>注意 <code>delta.detach()</code>：评论家给的点评只当成一个"固定的权重数字"喂给演员，不让演员的梯度顺着这条线倒灌进评论家——两张网各管各的。</p>
+</blockquote>
+<p>从原始策略梯度到 Actor-Critic，<strong>改动其实只有几行</strong>：把权重从 <code>G</code>（整局总分）换成 <code>G_t</code>（reward-to-go）换成 <code>G_t - V</code>（减基线）换成 <code>delta</code>（TD 误差）。母公式的骨架一行没变。</p>
+<h2 id="_5">??? 一图看懂<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
+<p>第一张图：<strong>五代算法的进化链</strong>，每一步只改"权重 <span class="arithmatex">\(\Phi_t\)</span>"。</p>
+<pre class="mermaid"><code>flowchart LR
+    A["①原始PG&lt;br/&gt;Φ=整局总分 G(τ)&lt;br/&gt;问题:步子易爆炸"] --&gt; B["②REINFORCE&lt;br/&gt;Φ=往后的分 G_t&lt;br/&gt;砍掉过去噪声"]
+    B --&gt; C["③带基线&lt;br/&gt;Φ=G_t ? V(S_t)&lt;br/&gt;分出好/坏而非全抬"]
+    C --&gt; D["④Actor-Critic&lt;br/&gt;Φ=δ (1步TD误差)&lt;br/&gt;走一步就能学"]
+    D --&gt; E["⑤GAE&lt;br/&gt;Φ=多步TD加权平均&lt;br/&gt;偏差/方差可调"]</code></pre>
+<p>第二张图：<strong>Actor-Critic 一个回合里两张网怎么配合</strong>。</p>
+<pre class="mermaid"><code>sequenceDiagram
+    participant E as 环境(倒立摆)
+    participant A as 演员π(策略网)
+    participant C as 评论家V(价值网)
+    A-&gt;&gt;E: 在状态 S_t 采样一个动作 A_t
+    E--&gt;&gt;A: 给出奖励 R_t 和新状态 S_t+1
+    E-&gt;&gt;C: 把 S_t, R_t, S_t+1 交给评论家
+    C-&gt;&gt;C: 算 TD 误差 δ = R_t + γV(S_t+1) ? V(S_t)
+    C--&gt;&gt;A: "这步比预期好/差 δ"（当权重）
+    A-&gt;&gt;A: 按 δ 抬高或压低 A_t 的概率
+    C-&gt;&gt;C: 顺手修正自己的估值 V(S_t)</code></pre>
+<h2 id="take">?? 产品经理 take<a class="headerlink" href="#take" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>这一章是看懂 RLHF / PPO / GRPO 的钥匙。</strong> ChatGPT、Claude 做"对齐"时跑的强化学习，骨架就是本章的母公式：让模型"多做能拿高分（人类更喜欢）的回答"。区别只在 <span class="arithmatex">\(\Phi_t\)</span> 怎么算、怎么防崩溃。</li>
+<li><strong>"方差 vs 偏差"是贯穿全章的产品权衡。</strong> 抖（方差大）→ 训练慢、不稳、烧更多算力；偏（偏差大）→ 可能学歪、收敛到次优。GAE 的 <span class="arithmatex">\(\lambda\)</span> 就是把这个权衡做成一个可调旋钮——这思路在很多工程系统里都通用。</li>
+<li><strong>"策略崩溃"是真实风险，不是理论玩具。</strong> 一次异常大的奖励/惩罚就可能把好不容易训出来的策略一把拽崩。所以下一章的 PPO 专门加了"步子别迈太大"的护栏——这也是为什么生产级 RL 几乎不用裸的策略梯度。</li>
+<li><strong>奖励设计 = 产品定义。</strong> 智能体只会拼命最大化你给的分。奖励设歪了（比如只奖"回答长"），模型就会学会"废话连篇"。在 RLHF 里，"奖励"来自人类偏好或奖励模型，<strong>这个信号的质量直接决定模型的行为上限</strong>。</li>
+</ul>
+<div class="admonition tip">
+<p class="admonition-title">一句话记住</p>
+<p>策略梯度法 = "做得好的动作多做、做得差的少做"；五代算法只是在<strong>反复打磨"做得好/差"这把尺子（权重 <span class="arithmatex">\(\Phi_t\)</span>）</strong>——从"整局总分"一路进化到"可调旋钮的优势估计 GAE"。</p>
+</div>
+<p>?? <strong>上一章</strong>：<a href="../04-rl-intro/">04 强化学习是什么</a> ｜ <strong>下一章</strong>：<a href="../06-ppo/">06 PPO：稳一点的策略更新</a></p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+    <a href="https://github.com/kuzicode" target="_blank" rel="noopener" title="kuzicode 的 GitHub 主页" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.top", "navigation.indexes", "toc.follow", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="../../assets/javascripts/mathjax.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

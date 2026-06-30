@@ -88,7 +88,8 @@ $$ \nabla_\theta J(\theta) = \mathbb{E}_{\tau\sim\pi_\theta}\!\left[\sum_{t=0}^{
 
 这正是开头那个"放手玩一局、根据总分整体调"的直觉。它能用，但毛病明显：如果某局总分特别高（比如 $G=10000$），更新步子会大到离谱，把策略一把拽崩——这叫策略崩溃。好比一个人突然中了一千万，整个人的行为模式直接被这一次巨大奖励带跑偏了。
 
-::: details 想看策略梯度定理的推导（可跳过）
+::: details
+想看策略梯度定理的推导（可跳过）
 
 目标函数 $J(\theta)=\mathbb{E}_{\tau\sim\pi_\theta}[G(\tau)]$，难点在于"期望里带着参数 $\theta$，没法直接求导"。推导的关键是一个叫 log 梯度技巧 的恒等式：
 
@@ -104,6 +105,8 @@ $$ \nabla_\theta \log P(\tau\mid\theta) = \sum_{t=0}^{T}\nabla_\theta \log \pi_\
 
 代回去就是母公式（$\Phi_t=G(\tau)$ 的版本）。
 
+:::
+
 ### 第 2 代：REINFORCE——别把"过去的分"算进来
 
 毛病：第 1 代里，第 $t$ 步动作的权重 $G(\tau)$ 包含了整局的分，连"做这步之前就已经拿到的分"都算进去了。可是——你这一步动作，不可能改变已经发生的过去。把过去的分掺进来，纯属噪声，让训练抖得厉害。
@@ -116,7 +119,8 @@ $$ \Phi_t = G_t = R_t + \gamma R_{t+1} + \cdots + \gamma^{T-t}R_T $$
 
 效果：不影响正确性（仍然无偏），但方差更小——训练更稳、更快。
 
-::: details 想看'砍掉过去回报'为什么不改变结果（可跳过）
+::: details
+想看'砍掉过去回报'为什么不改变结果（可跳过）
 
 把整局回报拆成"过去 + 未来"两段：$G(\tau)=G_{<t}+G_{\ge t}$。要证明过去那段在期望下对梯度的贡献为 0：
 
@@ -129,6 +133,8 @@ $$ \mathbb{E}[\nabla_\theta \log \pi_\theta(A_t\mid S_t)\mid H_t] = \sum_a \pi_\
 $$ \sum_a \nabla_\theta \pi_\theta(a\mid S_t) = \nabla_\theta \sum_a \pi_\theta(a\mid S_t) = \nabla_\theta 1 = 0 $$
 
 所以过去回报项的期望是 0，删掉它不引入偏差，只减少方差。这就是著名的 "reward-to-go" / 因果性技巧。
+
+:::
 
 ### 第 3 代：带基线（Baseline）——给分数找个"及格线"
 
@@ -144,7 +150,8 @@ $$ \Phi_t = G_t - b(S_t) $$
 
 举个例子：杆已经歪到必倒的状态，不管你怎么推，3 步后都得倒。这时 $G_t=3$，没基线的话还会傻乎乎地抬高当前动作概率；但价值函数早看穿了"这状态就值 3 分"，于是 $G_t - V(S_t)=0$，权重为 0——不瞎调，省掉无谓的训练。
 
-::: details 想看'减基线为什么不引入偏差'（可跳过）
+::: details
+想看'减基线为什么不引入偏差'（可跳过）
 
 核心是这个恒等式（对任意参数化概率分布都成立）：
 
@@ -155,6 +162,8 @@ $$ \mathbb{E}_{A_t\sim\pi_\theta}[\nabla_\theta \log \pi_\theta(A_t\mid S_t)] = 
 $$ \mathbb{E}_{A_t\sim\pi_\theta}[b(S_t)\nabla_\theta \log \pi_\theta(A_t\mid S_t)] = b(S_t)\cdot 0 = 0 $$
 
 所以减去基线那一项期望为 0，梯度的期望值不变（无偏），但方差能显著变小。注意：不能把 $G_t$ 也这样"提出来"，因为 $G_t$ 是随 $A_t$ 变化的，那一项不为 0。
+
+:::
 
 ### 第 4 代：Actor-Critic（演员-评论家）——边玩边学，不用等整局结束
 
@@ -207,6 +216,7 @@ $$ A_t^{\text{GAE}} = \delta_t + \gamma\lambda\, A_{t+1}^{\text{GAE}} $$
 
 先看最朴素的策略网络（一张 4→128→2 的小网，输出两个动作的概率）：
 
+```python
 class PolicyNet(nn.Module):           # 演员：决定做什么动作
     def __init__(self, action_size):
         super().__init__()
@@ -216,9 +226,11 @@ class PolicyNet(nn.Module):           # 演员：决定做什么动作
     def forward(self, x):
         x = F.relu(self.l1(x))
         return F.softmax(self.l2(x), dim=1)  # softmax 把分数变成概率
+```
 
 再看进化的核心——Actor-Critic 的一次更新（多了一张价值网 self.v，单步即可更新）：
 
+```python
 def update(self, state, action_prob, reward, next_state, done):
     # ① 评论家：让 V(S_t) 逼近 "R_t + γ·V(S_{t+1})"
     target = reward + self.gamma * self.v(next_state) * (1 - done)  # TD 目标
@@ -232,6 +244,7 @@ def update(self, state, action_prob, reward, next_state, done):
     # 两张网各自反向传播、各自更新
     self.optimizer_v.zero_grad(); loss_v.backward();  self.optimizer_v.step()
     self.optimizer_pi.zero_grad(); loss_pi.backward(); self.optimizer_pi.step()
+```
 
 注意 delta.detach()：评论家给的点评只当成一个"固定的权重数字"喂给演员，不让演员的梯度顺着这条线倒灌进评论家——两张网各管各的。
 
@@ -241,16 +254,17 @@ def update(self, state, action_prob, reward, next_state, done):
 
 第一张图：五代算法的进化链，每一步只改"权重 $\Phi_t$"。
 
-```
+```mermaid
 flowchart LR
     A["①原始PG<br/>Φ=整局总分 G(τ)<br/>问题:步子易爆炸"] --> B["②REINFORCE<br/>Φ=往后的分 G_t<br/>砍掉过去噪声"]
     B --> C["③带基线<br/>Φ=G_t − V(S_t)<br/>分出好/坏而非全抬"]
     C --> D["④Actor-Critic<br/>Φ=δ (1步TD误差)<br/>走一步就能学"]
     D --> E["⑤GAE<br/>Φ=多步TD加权平均<br/>偏差/方差可调"]
+```
 
 第二张图：Actor-Critic 一个回合里两张网怎么配合。
 
-```
+```mermaid
 sequenceDiagram
     participant E as 环境(倒立摆)
     participant A as 演员π(策略网)
@@ -262,6 +276,7 @@ sequenceDiagram
     C-->>A: "这步比预期好/差 δ"（当权重）
     A->>A: 按 δ 抬高或压低 A_t 的概率
     C->>C: 顺手修正自己的估值 V(S_t)
+```
 
 ## 🧠 产品经理 take
 
