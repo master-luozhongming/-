@@ -77,7 +77,7 @@ class ContentExtractor(HTMLParser):
         return ''.join(self.content)
 
 def main():
-    url = 'https://modelshit-class.vercel.app/01-rl/05-policy-gradient/'
+    url = 'https://modelshit-class.vercel.app/01-rl/06-ppo/'
 
     try:
         # 发送请求
