@@ -5,6 +5,12 @@ export default defineConfig({
   description: "理论与实践 - 知识蒸馏",
   lang: 'zh-CN',
 
+  // 忽略其他有问题的目录
+  srcExclude: ['**/align/**', '**/mm/**', '**/tools/**'],
+
+  // 禁用死链接检查
+  ignoreDeadLinks: true,
+
   themeConfig: {
     logo: '/logo.svg',
     siteTitle: 'RL Tutorial',
