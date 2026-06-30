@@ -1,98 +1,151 @@
-# 价值函数
 
-## 状态价值函数 V(s)
+KL散度（Kullback-Leibler Divergence, KLD）非常重要。
 
-### 定义
+假设有一个连续型随机变量 $x$ ，其概率密度表示为 $p(x)$ 。此时，函数 $f(x)$ 的期望值可以用下面的数学式表示。
 
-在状态 $s$ 下，按照策略 $\pi$ 行动，未来预期回报：
+$$
+\mathbb{E}_{p(x)}[f(x)]=\int f(x)p(x)dx
+$$
+关于概率分布 $q(x)$ 的期望值可以用下面的数学式表示。
 
-$$V_\pi(s) = E_\pi[G_t | S_t = s] = E_\pi\left[\sum_{k=0}^{\infty} \gamma^k R_{t+k} | S_t = s\right]$$
+$$
+\mathbb{E}_{q(x)}[f(x)]=\int f(x)q(x)dx
+$$
 
-### 直观理解
+## KL散度的定义
 
-- $V(s)$ 衡量状态 $s$ 有多"好"
-- 高 $V(s)$ 意味着从该状态出发能获得高回报
+衡量两个概率分布之间差异的一种方法是KL散度。当给定两个概率分布 $p(x)$ 和 $q(x)$ 时，KL散度可以用下面的数学式表示。
 
----
+$$
+D_{KL}(p\Vert q)=\int p(x)\log\frac{p(x)}{q(x)}dx
+$$
 
-## 动作价值函数 Q(s,a)
+上面的式子是当 $x$ 为连续型随机变量时的KL散度。当 $x$ 为离散型随机变量时，数学式如下所示。
 
-### 定义
+$$
+D_{KL}(p\Vert q)=\sum_x p(x)\log\frac{p(x)}{q(x)}
+$$
 
-在状态 $s$ 下采取动作 $a$，然后按照策略 $\pi$ 行动，未来预期回报：
+KL散度具有以下特性：
 
-$$Q_\pi(s, a) = E_\pi[G_t | S_t = s, A_t = a]$$
+- 两个概率分布的差异越大，KL散度的值就越大
+- KL散度的值大于或等于0，且仅当两个概率分布相同时，其值才为0
+- KL散度是非对称的衡量指标，因此 $D_{KL}(p\Vert q)$ 和 $D_{KL}(q\Vert p)$ 的值不同
 
-### 与 V(s) 的关系
+这些特性使得 KL 散度可以用来衡量两个概率分布的差异程度。下面我们通过具体的例子来了解这些特性。这里以抛硬币为例进行说明。假设一枚硬币正面朝上和反面朝上的概率是确定的，如下所示。
 
-$$V_\pi(s) = \sum_a \pi(a|s) Q_\pi(s, a)$$
+| 正面朝上的概率 | 70% |
+| -------------- | --- |
+| 反面朝上的概率 | 30% |
 
----
+这就是硬币的“真实概率分布”，在这里我们用符号 $p$ 来表示。假设有人对这枚硬币的概率分布做了如下估计。
 
-## 优势函数 A(s,a)
+| 正面朝上的概率 | 50% |
+| ------- | --- |
+| 反面朝上的概率 | 50% |
 
-### 定义
+我们用 $q$ 来表示这个估计的概率分布。此时，“真实概率分布 $p$ ”和“估计概率分布 $q$ ”之间的KL散度可以做如下计算。
 
-$$A_\pi(s, a) = Q_\pi(s, a) - V_\pi(s)$$
+$$
+\begin{split}
+D_{KL}(p\Vert q) &= 0.7\log\frac{0.7}{0.5}+0.3\log\frac{0.3}{0.5} \\
+&= 0.082\cdots
+\end{split}
+$$
 
-### 直观理解
+KL散度约为0.082。假设另一个人对这枚硬币的概率分布做了如下估计。
 
-- $A(s, a) > 0$: 动作 $a$ 比平均水平好
-- $A(s, a) < 0$: 动作 $a$ 比平均水平差
-- $A(s, a) = 0$: 动作 $a$ 是平均水平
+| 正面朝上的概率 | 20% |
+| ------- | --- |
+| 反面朝上的概率 | 80% |
 
----
+这与真实的概率分布值大相径庭。此时的KL散度的值如下所示。
 
-## 代码实现
+$$
+\begin{split}
+D_{KL}(p\Vert q) &= 0.7\log\frac{0.7}{0.2}+0.3\log\frac{0.3}{0.8} \\
+&= 0.58\cdots
+\end{split}
+$$
 
-```python
-import numpy as np
+这个值比第一个KL散度的值要大。最后，假设又有一个人对这枚硬币的概率分布做了如下估计。
 
-def compute_value_function(env, policy, gamma=0.99, theta=1e-6):
-    """
-    计算状态价值函数（迭代策略评估）
+| 正面朝上的概率 | 70% |
+| ------- | --- |
+| 反面朝上的概率 | 30% |
 
-    Args:
-        env: 环境
-        policy: 策略
-        gamma: 折扣因子
-        theta: 收敛阈值
+这个分布与真实的概率分布相同。此时的KL散度的值如下所示。
 
-    Returns:
-        V: 状态价值函数
-    """
-    n_states = env.observation_space.n
-    V = np.zeros(n_states)
+$$
+\begin{split}
+D_{KL}(p\Vert q) &= 0.7\log\frac{0.7}{0.7}+0.3\log\frac{0.3}{0.3} \\
+&= 0.7\log 1+0.3\log 1\quad(\log 1 = 0) \\
+&= 0
+\end{split}
+$$
 
-    while True:
-        delta = 0
-        for s in range(n_states):
-            v = V[s]
+由于 $p$ 和 $q$ 是相同的概率分布，因此KL散度为0。
 
-            # 计算新的价值
-            new_v = 0
-            for a in range(env.action_space.n):
-                action_prob = policy[s][a]
-                for prob, next_state, reward, done in env.P[s][a]:
-                    if done:
-                        new_v += action_prob * prob * reward
-                    else:
-                        new_v += action_prob * prob * (reward + gamma * V[next_state])
+从以上结果可以看出，KL散度可以用来衡量两个概率分布的差异程度。当两个概率分布相同时，KL散度取最小值0。两个概率分布的差异越大，KL散度的值就越大。
 
-            V[s] = new_v
-            delta = max(delta, abs(v - V[s]))
+## 信息论
 
-        if delta < theta:
-            break
+信息量（Self-Information）：
+- 一个事件发生的信息量定义为：$I(x) = -\log P(x)$
+- 概率越小的事件，包含的信息量越大
+- 例如："太阳从东边升起"（高概率）vs "中彩票"（低概率）
 
-    return V
-```
+熵（Entropy）：
+- 衡量随机变量的不确定性：$H(P) = -\sum_{i} P(x_i) \log P(x_i)$
+- 熵越大，不确定性越大
 
----
+交叉熵（Cross-Entropy）：
+- 衡量两个概率分布之间的差异：$H(P, Q) = -\sum_{i} P(x_i) \log Q(x_i)$
+- 其中 $P$ 是真实分布，$Q$ 是预测分布
 
-## 关键要点
+## 从极大似然估计到交叉熵
 
-1. **V(s)** 评估状态的好坏
-2. **Q(s,a)** 评估状态-动作对的好坏
-3. **A(s,a)** 衡量动作相对于平均水平的优势
-4. 价值函数是强化学习的核心概念
+假设我们有训练数据 ${(x_1, y_1), (x_2, y_2), ..., (x_n, y_n)}$，其中 $y_i$ 是真实标签。
+
+似然函数：
+
+$$
+L(\theta) = \prod_{i=1}^{n} P(y_i | x_i; \theta)
+$$
+
+对数似然：
+
+$$
+\log L(\theta) = \sum_{i=1}^{n} \log P(y_i | x_i; \theta)
+$$
+
+最大化对数似然 = 最小化负对数似然：
+
+$$
+\text{Loss} = -\frac{1}{n}\sum_{i=1}^{n} \log P(y_i | x_i; \theta)
+$$
+
+这就是 **交叉熵损失** ！
+
+## 从 KL 散度到交叉熵
+
+KL散度衡量两个分布的差异：
+
+$$
+D_{KL}(P||Q) = \sum_{i} P(x_i) \log \frac{P(x_i)}{Q(x_i)} = \sum_{i} P(x_i) \log P(x_i) - \sum_{i} P(x_i) \log Q(x_i)
+$$
+
+$$
+D_{KL}(P||Q) = -H(P) + H(P,Q)
+$$
+
+$$
+\frac{\partial D_{KL}(P\Vert Q)}{\partial\theta} = \frac{\partial H(P, Q)}{\partial \theta}
+$$
+
+其中：
+- $H(P) = -\sum_{i} P(x_i) \log P(x_i)$ 是真实分布的熵（常数）
+- $H(P,Q) = -\sum_{i} P(x_i) \log Q(x_i)$ 是交叉熵
+
+最小化KL散度 = 最小化交叉熵（因为真实分布的熵是常数）
+

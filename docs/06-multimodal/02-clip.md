@@ -1,376 +1,200 @@
-# CLIP 模型
 
-## 为什么需要 CLIP？
+## 1. **on-policy** 和 **off-policy** 有什么区别？
 
-传统的计算机视觉模型有一个问题：**只能识别训练过的类别**。
-
-比如，一个在 ImageNet（1000 类）上训练的模型：
-- ✅ 可以识别"猫"、"狗"、"汽车"等
-- ❌ 无法识别"柯基"、"哈士奇"等（如果没见过）
-
-**CLIP**（Contrastive Language-Image Pre-training）通过**对比学习**连接图像和文本，实现**零样本分类**。
-
----
-
-## 核心思想
-
-### 从文本到图像
-
-CLIP 的核心思想：
-
-> 用文本描述图像，让模型学会图像和文本的对应关系。
-
-### 流程
-
-```
-图像 ─────► 图像编码器 ─────► 图像特征
-                                    ↓
-                              对比学习
-                                    ↑
-文本 ─────► 文本编码器 ─────► 文本特征
+```ad-note
+on-policy: 在策略，同策略，在线策略
+off-policy: 离策略，异策略，离线策略
 ```
 
-### 对比学习
+**on-policy**：智能体和环境进行实时交互，实时获得反馈并更新策略。
 
-对比学习的目标：
+小明边下棋边学习下棋就是同策略学习。
 
-- **正样本**：图像和对应的文本描述
-- **负样本**：图像和不对应的文本描述
+所以原始策略梯度法就是同策略学习。
 
-让正样本的相似度**高**，负样本的相似度**低**。
+**off-policy**：智能体与环境无实时交互，通过事先收集的离线数据集学习。
 
----
+小明通过看别人下棋来学习下棋。就是异策略学习。
 
-## InfoNCE 损失
+PPO：使用旧的策略采样的数据来学习新的策略，但由于旧的策略和新的策略偏差不大，所以 PPO 算是同策略学习。
 
-### 公式
+DPO：使用了偏好数据集，是不是强化学习都有争议。
 
-InfoNCE 损失：
+GRPO：针对 PPO 的改进，所以是同策略学习。
 
-$$L = -\frac{1}{N} \sum_{i=1}^{N} \log \frac{\exp(\text{sim}(I_i, T_i) / \tau)}{\sum_{j=1}^{N} \exp(\text{sim}(I_i, T_j) / \tau)}$$
+## 2. PPO算法中使用GAE的好处以及参数 $\gamma$ 和 $\lambda$ 的作用是什么？
 
-其中：
-- $I_i$：第 $i$ 个图像的特征
-- $T_i$：第 $i$ 个文本的特征
-- $\text{sim}(I, T)$：余弦相似度
-- $\tau$：温度参数
-
-### 直观理解
-
-对于第 $i$ 个图像：
-- 分子：$\exp(\text{sim}(I_i, T_i) / \tau)$，正样本的相似度
-- 分母：$\sum_{j=1}^{N} \exp(\text{sim}(I_i, T_j) / \tau)$，所有样本的相似度之和
-
-**目标**：让正样本的相似度占总相似度的比例最大化。
-
-### 代码实现
-
-```python
-import torch
-import torch.nn.functional as F
-
-def contrastive_loss(image_features, text_features, temperature=0.07):
-    """
-    InfoNCE 对比损失
-
-    L = -1/N ∑_i log exp(sim(I_i, T_i)/τ) / ∑_j exp(sim(I_i, T_j)/τ)
-    """
-    # 1. 归一化特征
-    image_features = F.normalize(image_features, dim=-1)
-    text_features = F.normalize(text_features, dim=-1)
-
-    # 2. 计算相似度矩阵
-    # (N, D) @ (D, N) = (N, N)
-    logits = image_features @ text_features.T / temperature
-
-    # 3. 创建标签：对角线是正样本
-    labels = torch.arange(len(logits), device=logits.device)
-
-    # 4. 双向对比损失
-    # 图像 → 文本
-    loss_i2t = F.cross_entropy(logits, labels)
-    # 文本 → 图像
-    loss_t2i = F.cross_entropy(logits.T, labels)
-
-    # 5. 平均
-    return (loss_i2t + loss_t2i) / 2
+```ad-note
+GAE: Generalized Advantage Estimation, 广义优势估计
 ```
 
-### 为什么是双向对比？
+1. 改进对动作的优势的估计，提高训练稳定性和收敛速度。
+2. 减小训练中的方差，并更准确地估计动作的优势。
 
-- **图像 → 文本**：给定图像，找到对应的文本
-- **文本 → 图像**：给定文本，找到对应的图像
+$\gamma$ ：折扣因子，一个重要的强化学习超参数，通常用于衡量未来奖励的重要性，其控制了在计算奖励时对未来奖励的折扣程度。当 $\gamma$ 接近 $1$ 时，智能体更关注未来的奖励，即长期奖励，而当 $\gamma$ 接近 $0$ 时，智能体更关注即时奖励，即短期奖励。在PPO中， $\gamma$ 被用来计算GAE，即GAE的折扣因子。通常，合理的 $\gamma$ 值可以帮助平衡长期和短期奖励，使策略学习更加稳定。
 
-双向对比可以学习更全面的表示。
+$\lambda$ ：GAE中的另一个重要参数，用于平衡多个时间步上的奖励估计。$\lambda$ 介于 $0$ 和 $1$ 之间，它决定了在计算GAE时考虑多个时间步的奖励。具体来说，它平衡了在单个时间步上估计的TD（时序差分）误差和多个时间步的估计之间的权衡。选择合适的 $\lambda$ 值可以帮助平衡方差和偏差，以获得更准确的优势估计。
 
----
+在PPO中，使用GAE结合 $\gamma$ 和 $\lambda$ 的好处
 
-## 图像编码器
+1. 可以更准确地估计每个时间步上的优劣行为，改进策略梯度的估计。
+2. 有助于提高PPO算法的稳定性和训练性能，使其能够更好地处理复杂的强化学习问题。
 
-### 架构
+## 3. 有哪些PPO算法的调参经验？
 
-CLIP 的图像编码器可以使用：
+直接采用默认的参数基本就可以。例如裁剪的范围 $\epsilon$ 可以根据原始论文设置为 $\epsilon=0.2$ 。然后就是折扣因子和 $\lambda$ 也可以调整一下。
 
-1. **ResNet**：CNN 架构
-2. **ViT**：Transformer 架构
+PPO 最麻烦的是训练一个好的 **奖励模型** 。后面的算法 DPO 和 GRPO 都是试图在避免训练奖励模型。
 
-这里以 ViT 为例：
+训练奖励模型的挑战：
 
-```python
-import torch
-import torch.nn as nn
+1. 奖励的目标是什么？是数学推理充分，还是回答温柔无害，还是......
+2. 高质量的数据如何收集？大量的金钱。
+3. 奖励模型的参数量要多大？奖励模型如果尺寸太大，每次给奖励（前向传播，推理）都要耗费很大的算力。尺寸太小，给的奖励不准确。
+4. 奖励模型 $R_\theta$ 的损失函数：$\mathcal{L}(\theta)=-\sum_{(A,B)}\log\sigma(R_\theta(A)-R_\theta(B))$ 。如果人类希望输出回答 A 的概率高于输出回答 B 的概率，那么需要最小化损失函数。
 
-class ImageEncoder(nn.Module):
-    def __init__(self, embed_dim=512):
-        """
-        图像编码器
+## 4. 现阶段LLM的对齐阶段分为sft和rlhf阶段，我们可以跳过sft阶段直接进行rlhf么？
 
-        使用 ViT 提取图像特征
-        """
-        super().__init__()
+当然可以。GRPO 就可以做到这一点。让模型自动产生思维链。然后训练出了 DeepSeek-R1-Zero 。但有 SFT 数据集不用也太浪费了，所以一般都是在 sft 微调后的模型上做 rlhf 。
 
-        # 使用 ViT
-        self.vit = VisionTransformer(embed_dim=embed_dim)
+## 5. DPO的第0步loss是多少？
 
-        # 投影层：将特征映射到共享空间
-        self.proj = nn.Linear(embed_dim, embed_dim)
+DPO 的 reward 是根据策略模型和参考模型的概率比确定的，在初始的时候，`chosen_reward = rejected_reward = 0` ，所以 `loss` 是 `-logsigmoid(0)` 。
 
-    def forward(self, images):
-        """
-        前向传播
+## 6. DPO训练时，为什么chosen和rejected的reward一起下降的猜想？
 
-        输入: (B, C, H, W)
-        输出: (B, embed_dim)
-        """
-        # 提取特征
-        features = self.vit(images)  # (B, embed_dim)
+如果数据没有标注好，那么可能出现下面的数据标注，偏好为
 
-        # 投影到共享空间
-        return self.proj(features)  # (B, embed_dim)
+A > B > C > A
+
+```
+{
+	"chosen": A,
+	"rejected": B,
+}
+
+{
+	"chosen": B,
+	"rejected": C,
+}
+
+{
+	"chosen": C,
+	"rejected": A,
+}
 ```
 
----
+这样的数据偏好，直接把dpo整懵了。不知道该提高输出哪个回答的概率了。
 
-## 文本编码器
+## 7. sft 模型出现各种复读问题如何解决？
 
-### 架构
+DPO 处理这种问题，不需要多少偏好数据集就能解决掉这种问题。
 
-CLIP 的文本编码器使用 Transformer：
+## 8. 如何看待各种ppo rlhf的平替算法dpo/kto/rrhf/slic/orpo/samug/remax等算法号称性能等能超过ppo？
 
-```python
-class TextEncoder(nn.Module):
-    def __init__(self, vocab_size=49408, embed_dim=512, max_length=77):
-        """
-        文本编码器
+我们注意到 Reward Model 有个很有意思的点，当使用大模型来搭建 reward model 时，我们获得的可能不仅仅是人类标注中蕴含的那部分知识，同时还激发了模型在预训练过程中学到的一部分能力来做判别，这是我认为 PPO 和 DPO 一个比较重要的区别，甚至我们还可以对 reward model 做一些提示词工程。举一个具体例子，可能我们给的所有标注都是没有长度偏好的，但是 reward model 在预训练过程中就理解到详细的回答可能是更专业，更受人喜欢的，这样的知识就会通过 PPO 传导给 policy 模型，而 DPO 没有这样的效果。
 
-        使用 Transformer 提取文本特征
-        """
-        super().__init__()
+## 9. 如何处理reward model中的噪声数据？
 
-        # Token 嵌入
-        self.token_embed = nn.Embedding(vocab_size, embed_dim)
+实践中可以通过让多个 reward model 进行投票，把一致性低的拿出来检查或者丢掉；也可以寄希望于闭源的大模型，比如 GPT4，替代人完成清洗工作。
 
-        # 位置嵌入
-        self.pos_embed = nn.Embedding(max_length, embed_dim)
+## 10. 在PPO过程中，reward model的效果上会有什么问题？
 
-        # Transformer 编码器
-        self.transformer = TransformerEncoder(embed_dim, 8, 4)
+reward model 的数据本身是有限标注的，那么在 PPO 训练过程中，模型产生的新样本可能是分布外的（OOD问题，out of distribution），那么 reward model 的准确率可能会降低；更极端的情况下，policy 模型可能找到一些 hacking 解，虽然可能毫无意义，但是获得了很高的 reward；这里可能可以用多个奖励模型投票的方式来增强鲁棒性。
 
-        # 投影层
-        self.proj = nn.Linear(embed_dim, embed_dim)
+## 11. 现有的 reward model 泛化能力怎么样？我们需要用大 reward model 吗？
 
-    def forward(self, text):
-        """
-        前向传播
+首先原始的 InstructGPT 是用 7B 模型指导 175B 模型对齐，但是后续大部分人用的 reward model 至少不小于 policy 模型。我想到几个理由：
 
-        输入: (B, T)
-        输出: (B, embed_dim)
-        """
-        B, T = text.shape
+1. 我曾经调研过大模型的涌现，小模型的指令跟随能力是比较差的，那么对于复杂问题，小模型连问题都无法理解，应该是很难评判回答质量的。
+2. 大模型的知识储量大，判断回答中的幻觉会更准确。3. 大模型通常具有更好的 **分布外** （OOD） 检测能力。
 
-        # 1. Token 嵌入 + 位置嵌入
-        positions = torch.arange(T, device=text.device)
-        x = self.token_embed(text) + self.pos_embed(positions)
+## 12. DPO训练可能会出现什么问题？
 
-        # 2. Transformer 编码
-        x = self.transformer(x)
+梯度爆炸或消失：由于 DPO 更直接地优化策略目标函数，可能导致策略更新过快或过剧，从而导致梯度爆炸或消失的问题。
 
-        # 3. 提取 [EOS] token 的特征
-        # CLIP 使用 [EOS] token 的特征作为整个句子的表示
-        x = x[torch.arange(B), text.argmax(dim=-1)]
+收敛性问题：DPO 没有像 PPO 那样的机制来限制策略更新，因此可能在训练过程中出现不稳定或策略崩溃的情况。
 
-        # 4. 投影到共享空间
-        return self.proj(x)
+探索和利用之间的平衡问题: 由于 DPO 直接最小化目标函数，可能会倾向于过早地进行利用，导致探索不足，从而无法找到全局最优解。
+
+## 13. 讲一下DPO和PPO，DPO和PPO有什么区别？
+
+- PPO (Proximal Policy Optimization): PPO 是一种强化学习算法，采用了策略优化方法。它的目标是通过限制策略更新的幅度来避免策略剧烈变化，减小策略崩溃的风险。具体做法是通过剪裁损失函数，确保策略变化在一个较小的范围内，从而提高训练的稳定性。PPO 的核心是引入了一种近端目标函数，利用优势函数更新策略，兼顾了策略的探索和收敛。
+- DPO (Direct Preference Optimization): DPO 是一种最近提出的算法，旨在简化传统强化学习中的策略优化问题。它的主要思想是通过直接最小化目标函数来优化策略，而不是像 PPO 一样通过对数比率和剪裁损失函数来进行策略更新。DPO 采用了更直接的优化方式，简化了策略更新的过程。
+
+区别
+
+- 策略更新: PPO 通过限制策略变化幅度（例如剪裁）来实现稳定训练，而 DPO 更倾向于直接优化目标函数。
+- 稳定性和效率: PPO 通常能够保持较高的稳定性，但训练效率可能较低；DPO 则更高效，但可能在一定程度上牺牲了训练的稳定性。
+
+## 14. PPO的缺点是什么？
+
+在训练 PPO 的过程中，需要 4 个模型同时加载到 GPU 中，策略模型（要微调的大模型），冻结的参考模型，价值函数模型（value head，线性层），以及奖励模型。需要很大的算力。
+
+## 15. DPO的偏好数据集长什么样子
+
+```
+{
+	"prompt": "....",
+	"chosen": "....",
+	"rejected": "....",
+}
 ```
 
-### 为什么用 [EOS] token？
+三元组。
 
-- [EOS]（End of Sentence）token 位于句子末尾
-- 它会聚合整个句子的信息
-- 类似于 ViT 中的 CLS token
+## 16. DPO的损失函数是什么？
 
----
+参见教程，需要背会。
 
-## CLIP 模型
+## 17. 在什么情况下，DPO 在数学上等价于 PPO ？
 
-### 完整实现
+DPO 的一个关键特性是，当 Bradley-Terry 模型完美拟合我们的偏好数据，并且 RLHF 学习到最优奖励函数时，RHLF 和 DPO 的全局优化器是相同的。
 
-```python
-class CLIP(nn.Module):
-    def __init__(self, embed_dim=512):
-        """
-        CLIP 模型
+这是一个重要的等价结果；然而在实践中：
 
-        连接图像和文本的对比学习模型
-        """
-        super().__init__()
+1. Bradley-Terry 模型通常不能完美地拟合偏好数据。
+2. RLHF 学习到的奖励函数不会是最优的奖励函数。
+3. 在高度非凸的损失景观（例如 LLM）上进行梯度下降找不到全局优化器。
 
-        # 图像编码器
-        self.image_encoder = ImageEncoder(embed_dim)
-
-        # 文本编码器
-        self.text_encoder = TextEncoder(embed_dim=embed_dim)
-
-        # 温度参数：可学习
-        self.temperature = nn.Parameter(torch.ones([]) * 0.07)
-
-    def forward(self, images, text):
-        """
-        前向传播
-
-        计算对比损失
-        """
-        # 1. 编码图像
-        image_features = self.image_encoder(images)
-
-        # 2. 编码文本
-        text_features = self.text_encoder(text)
-
-        # 3. 计算对比损失
-        return contrastive_loss(image_features, text_features, self.temperature)
-
-    def encode_image(self, images):
-        """编码图像"""
-        return self.image_encoder(images)
-
-    def encode_text(self, text):
-        """编码文本"""
-        return self.text_encoder(text)
+```ad-note
+例如，偏好循环会导致 Bradley-Terry 模型无法完美拟合数据。Bradley-Terry 模型假设偏好具有传递性。例如，如果 $A \succ B$ 和 $B \succ C$ 成立，则模型预期结果为 $A \succ B \succ C$ 。但如果结果为 $C \succ A$ ，则存在循环，传递性被破坏。
 ```
 
----
+## 18. DPO的变种算法有哪些？主要解决了DPO的什么问题？
 
-## 零样本分类
+- **IPO** ：由于 Bradley-Terry 模型的目标是最大化人类喜欢的回答和人类讨厌的回答之间的奖励差值，但其中可能忽略了偏好对中的噪声，所以无限扩大奖励差值就不太合适了，也就是过拟合了偏好对数据。所以需要加正则项，将奖励差值进行裁剪。
+- **DPOP** ：假设人类喜欢的回答和人类不喜欢的回答太相似了，差不了几个字。那么LLM很难区分这两者。如何一直想要增大这两种相似回答的奖励差值，模型效果会崩塌。也就是LLM输出正例和负例的概率同时往下降。所以 DPOP 加了一个正则项，来惩罚正例的奖励往下掉的偏好数据对，来使得正例的概率往上升。
 
-### 核心思想
+## 19. 如何微调出带有思维链的LLM推理模型？
 
-CLIP 的强大之处在于**零样本分类**：
+- PPO：奖励模型奖励那些带思维链的输出。
+- DPO：正例数据带有思维链，负例数据不带思维链。
+- GRPO：使用基于规则的奖励函数微调LLM。
 
-> 不需要微调，直接用文本描述来分类图像。
+在不微调的情况下，使用推理时间扩展，来让LLM产生带有思维链的输出。本质上是Prompt Engineering。
 
-### 流程
+## 20. 带有思维链的推理模型优缺点？
 
-1. **准备文本提示**：为每个类别创建文本描述
-2. **编码图像和文本**：用 CLIP 编码
-3. **计算相似度**：找到最相似的文本
-4. **分类**：选择相似度最高的类别
+| 擅长                  | 不擅长               |
+| ------------------- | ----------------- |
+| 演绎或者归纳推理（如解谜题、数学证明） | 快速且粗略的回答（更多的推理时间） |
+| 思维链式推理（分解多步骤问题）     | 基于知识的任务（容易产生幻觉）   |
+| 复杂决策任务              | 简单任务（过度思考）        |
+| 对新问题有更好的泛化能力        |                   |
 
-### 代码实现
+## 21. 使用DPO能训练出带有CoT的模型吗？
 
-```python
-def zero_shot_classify(model, image, class_names, tokenizer):
-    """
-    零样本分类
+## 22. 对后续的一些RLHF算法有了解吗？
 
-    参数:
-        model: CLIP 模型
-        image: 输入图像
-        class_names: 类别名称列表
-        tokenizer: 分词器
-    """
-    # 1. 编码图像
-    image_features = model.encode_image(image)
+- KTO
+- SimPO
+- GSPO
+- DAPO
 
-    # 2. 创建文本提示
-    # "a photo of a {class_name}"
-    text_inputs = [f"a photo of a {name}" for name in class_names]
-    text_features = model.encode_text(tokenizer(text_inputs))
+## 23. 为什么使用PPO而不使用DPO和GRPO？
 
-    # 3. 计算相似度
-    similarity = image_features @ text_features.T
+## 24. 为什么使用GRPO不用PPO？
 
-    # 4. 返回最相似的类别
-    return class_names[similarity.argmax()]
-```
+## 25. 为什么使用DPO不用PPO？
 
-### 示例
-
-```python
-# 类别名称
-class_names = ["cat", "dog", "car", "bird"]
-
-# 零样本分类
-predicted_class = zero_shot_classify(model, image, class_names, tokenizer)
-print(f"Predicted: {predicted_class}")
-```
-
----
-
-## CLIP vs 传统分类
-
-### 优势
-
-| 特性 | 传统分类 | CLIP |
-|------|----------|------|
-| 类别限制 | 只能识别训练过的类别 | 可以识别任意类别 |
-| 数据需求 | 需要大量标注数据 | 不需要标注数据 |
-| 泛化能力 | 弱 | 强 |
-| 多模态 | 否 | 是 |
-
-### 劣势
-
-| 特性 | 传统分类 | CLIP |
-|------|----------|------|
-| 精度 | 高（特定任务） | 中（通用） |
-| 计算开销 | 小 | 大 |
-| 可解释性 | 强 | 弱 |
-
----
-
-## 深入讨论
-
-### 为什么 CLIP 能实现零样本分类？
-
-1. **共享嵌入空间**：图像和文本映射到同一个空间
-2. **语义理解**：文本描述包含了语义信息
-3. **对比学习**：学会了图像和文本的对应关系
-
-### 温度参数 $\tau$ 的作用
-
-- $\tau$ 越小：分布越尖锐，模型越自信
-- $\tau$ 越大：分布越平滑，模型越不确定
-- CLIP 使用可学习的 $\tau$，初始值为 0.07
-
-### CLIP 的局限性
-
-1. **细粒度分类**：难以区分相似类别（如不同品种的狗）
-2. **组合推理**：难以理解复杂的空间关系
-3. **否定理解**：难以理解否定句
-
----
-
-## 关键要点
-
-1. **CLIP 通过对比学习连接图像和文本**
-2. **InfoNCE 损失**让正样本相似度高，负样本相似度低
-3. **零样本分类**不需要微调，直接用文本描述分类
-4. **共享嵌入空间**是 CLIP 的核心
-5. **广泛应用**：图像检索、图像生成、多模态理解
-
----
-
-## 延伸阅读
-
-1. **ALIGN**：大规模对比学习的图像-文本模型
-2. **BLIP**：统一的视觉-语言预训练框架
-3. **Stable Diffusion**：使用 CLIP 作为文本编码器的图像生成模型

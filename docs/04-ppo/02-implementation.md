@@ -1,435 +1,320 @@
-# PPO 实现
 
-## 为什么需要完整实现？
+```ad-note
+近端策略优化（Proximal Policy Optimization，PPO），其性能与最先进的方法相当或更好，同时代码实现和优化起来更简单。
+```
 
-理解 PPO 的理论很重要，但**完整的实现**同样关键。本章将带你实现一个完整的 PPO 算法，包括：
+我们还是使用倒立摆环境来测试PPO算法。我们实现带裁剪目标的PPO算法。
 
-1. **Actor-Critic 网络**：策略网络和价值网络
-2. **GAE 计算**：广义优势估计
-3. **PPO 损失函数**：裁剪目标 + 价值损失 + 熵损失
-4. **训练循环**：数据采集 → 优势计算 → 多轮更新
+首先定义策略的网络结构和价值函数的网络结构
 
----
-
-## Actor-Critic 网络
-
-### 架构设计
-
-PPO 使用 Actor-Critic 架构：
-
-- **Actor（策略网络）**：输出动作概率分布
-- **Critic（价值网络）**：估计状态价值 $V(s)$
-
-### 为什么共享特征层？
+## 网络结构的定义
 
 ```python
+import gym
 import torch
-import torch.nn as nn
-from torch.distributions import Categorical
+import torch.nn.functional as F
+import numpy as np
+import matplotlib.pyplot as plt
 
-class ActorCritic(nn.Module):
-    def __init__(self, state_dim, action_dim, hidden_dim=256):
-        super().__init__()
+class PolicyNet(torch.nn.Module):
+	'''策略网络'''
+    def __init__(self, state_dim, hidden_dim, action_dim):
+        super(PolicyNet, self).__init__()
+        # 对于倒立摆：state_dim = 4, hidden_dim = 128
+        self.fc1 = torch.nn.Linear(state_dim, hidden_dim)
+        # 对于倒立摆：action_dim = 2
+        self.fc2 = torch.nn.Linear(hidden_dim, action_dim)
 
-        # 共享特征层
-        # 为什么共享？策略和价值函数都依赖于对状态的理解
-        self.shared = nn.Sequential(
-            nn.Linear(state_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU()
-        )
+    def forward(self, x):
+        x = F.relu(self.fc1(x))
+        return F.softmax(self.fc2(x), dim=1)
 
-        # Actor（策略网络）
-        # 输出每个动作的概率
-        self.actor = nn.Sequential(
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, action_dim),
-            nn.Softmax(dim=-1)  # 确保输出是概率分布
-        )
+class ValueNet(torch.nn.Module):
+	'''价值网络'''
+    def __init__(self, state_dim, hidden_dim):
+        super(ValueNet, self).__init__()
+        # state_dim = 4
+        self.fc1 = torch.nn.Linear(state_dim, hidden_dim)
+        # 输出是一个价值，是标量
+        self.fc2 = torch.nn.Linear(hidden_dim, 1)
 
-        # Critic（价值网络）
-        # 输出状态价值 V(s)
-        self.critic = nn.Sequential(
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.ReLU(),
-            nn.Linear(hidden_dim, 1)  # 输出标量
-        )
-
-    def forward(self, state):
-        """前向传播"""
-        features = self.shared(state)  # 提取特征
-        action_probs = self.actor(features)  # 动作概率
-        value = self.critic(features)  # 状态价值
-        return action_probs, value
-
-    def get_action(self, state):
-        """采样动作"""
-        action_probs, value = self.forward(torch.FloatTensor(state))
-
-        # 创建分类分布
-        dist = Categorical(action_probs)
-
-        # 采样动作
-        action = dist.sample()
-
-        # 返回动作、log 概率、价值
-        return action.item(), dist.log_prob(action), value
-
-    def evaluate(self, states, actions):
-        """评估动作"""
-        action_probs, values = self.forward(states)
-
-        # 创建分类分布
-        dist = Categorical(action_probs)
-
-        # 计算 log 概率
-        log_probs = dist.log_prob(actions)
-
-        # 计算熵（用于探索）
-        entropy = dist.entropy()
-
-        return log_probs, values.squeeze(), entropy
+    def forward(self, x):
+        x = F.relu(self.fc1(x))
+        return self.fc2(x)
 ```
 
-### 直观理解
+然后我们来实现带裁剪目标的PPO算法
 
-```
-状态 s
-    ↓
-┌───────────────┐
-│ 共享特征层    │  提取状态特征
-└───────────────┘
-    ↓           ↓
-┌───────────┐ ┌───────────┐
-│ Actor     │ │ Critic    │
-│ 策略网络  │ │ 价值网络  │
-└───────────┘ └───────────┘
-    ↓           ↓
-π(a|s)      V(s)
-```
-
----
-
-## GAE 计算
-
-### 为什么需要 GAE？
-
-GAE（Generalized Advantage Estimation）用于计算优势函数 $A_t$：
-
-$$A_t = Q(s_t, a_t) - V(s_t)$$
-
-直接计算 $Q(s_t, a_t)$ 方差大，GAE 通过**指数加权平均**来平衡偏差和方差。
-
-### GAE 公式
-
-$$A_t^{GAE} = \sum_{l=0}^{\infty} (\gamma \lambda)^l \delta_{t+l}$$
-
-其中：
-- $\delta_t = r_t + \gamma V(s_{t+1}) - V(s_t)$（TD 误差）
-- $\gamma$：折扣因子
-- $\lambda$：GAE 参数，控制偏差-方差权衡
-
-### 代码实现
-
-```python
-def compute_gae(rewards, values, next_values, dones, gamma=0.99, lam=0.95):
-    """
-    计算广义优势估计 (GAE)
-
-    A_t = ∑_{l=0}^{∞} (γλ)^l δ_{t+l}
-
-    其中 δ_t = r_t + γV(s_{t+1}) - V(s_t)
-    """
-    advantages = []
-    gae = 0
-
-    # 从后往前计算
-    for t in reversed(range(len(rewards))):
-        # TD 误差
-        delta = rewards[t] + gamma * next_values[t] * (1 - dones[t]) - values[t]
-
-        # GAE 递推公式
-        gae = delta + gamma * lam * (1 - dones[t]) * gae
-
-        # 插入到列表开头
-        advantages.insert(0, gae)
-
-    # 转换为 tensor
-    advantages = torch.FloatTensor(advantages)
-
-    # 计算回报（用于价值函数训练）
-    returns = advantages + torch.FloatTensor(values)
-
-    # 标准化优势（减少方差）
-    advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
-
-    return advantages, returns
-```
-
-### 直观理解
-
-```
-时间步 t:    s_t → a_t → r_t → s_{t+1}
-TD 误差:     δ_t = r_t + γV(s_{t+1}) - V(s_t)
-
-GAE:         A_t = δ_t + γλδ_{t+1} + (γλ)^2δ_{t+2} + ...
-
-当 λ=0:     A_t = δ_t（只有当前 TD 误差，偏差大方差小）
-当 λ=1:     A_t = G_t - V(s_t)（完整回报，偏差小方差大）
-```
-
----
-
-## PPO 损失函数
-
-### 三重损失
-
-PPO 的损失函数由三部分组成：
-
-$$L(\theta) = L^{CLIP} - c_1 L^{VF} + c_2 S$$
-
-其中：
-- $L^{CLIP}$：裁剪的策略目标
-- $L^{VF}$：价值函数损失
-- $S$：熵正则化项
-
-### 代码实现
-
-```python
-def ppo_loss(old_log_probs, new_log_probs, advantages, returns, values,
-             clip_epsilon=0.2, c1=0.5, c2=0.01):
-    """
-    PPO 损失函数
-
-    L(θ) = E[L^CLIP(θ) - c1 * L^VF(θ) + c2 * S[π_θ](s)]
-    """
-    # 计算比率 r_t(θ) = π_θ(a|s) / π_θ_old(a|s)
-    # 用 log 概率计算更稳定：r_t(θ) = exp(log π_θ(a|s) - log π_θ_old(a|s))
-    ratio = torch.exp(new_log_probs - old_log_probs)
-
-    # 裁剪目标 L^CLIP
-    surr1 = ratio * advantages
-    surr2 = torch.clamp(ratio, 1 - clip_epsilon, 1 + clip_epsilon) * advantages
-    actor_loss = -torch.min(surr1, surr2).mean()
-
-    # 价值函数损失 L^VF
-    critic_loss = nn.MSELoss()(values, returns)
-
-    # 熵损失（鼓励探索）
-    # 熵 = -∑ π(a|s) log π(a|s)
-    entropy = -torch.sum(torch.exp(new_log_probs) * new_log_probs, dim=-1)
-    entropy_loss = -entropy.mean()
-
-    # 总损失
-    total_loss = actor_loss + c1 * critic_loss + c2 * entropy_loss
-
-    return total_loss, actor_loss, critic_loss, entropy_loss
-```
-
-### 为什么要用 log 概率？
-
-直接计算 $r_t(\theta) = \frac{\pi_\theta(a_t|s_t)}{\pi_{\theta_{old}}(a_t|s_t)}$ 可能导致数值不稳定。
-
-用 log 概率计算更稳定：
-
-$$r_t(\theta) = \exp(\log \pi_\theta(a_t|s_t) - \log \pi_{\theta_{old}}(a_t|s_t))$$
-
----
-
-## 完整的 PPO 算法
-
-### 算法类
+## PPO训练器
 
 ```python
 class PPO:
-    def __init__(self, state_dim, action_dim, lr=3e-4, gamma=0.99,
-                 lam=0.95, clip_epsilon=0.2, n_epochs=10, batch_size=64):
-        """
-        PPO 算法
-
-        参数:
-            state_dim: 状态维度
-            action_dim: 动作维度
-            lr: 学习率
-            gamma: 折扣因子
-            lam: GAE 参数
-            clip_epsilon: 裁剪参数
-            n_epochs: 每批数据训练轮数
-            batch_size: 批次大小
-        """
-        self.policy = ActorCritic(state_dim, action_dim)
-        self.optimizer = torch.optim.Adam(self.policy.parameters(), lr=lr)
-
-        self.gamma = gamma
-        self.lam = lam
-        self.clip_epsilon = clip_epsilon
-        self.n_epochs = n_epochs
-        self.batch_size = batch_size
-
-    def compute_gae(self, rewards, values, next_values, dones):
-        """计算 GAE"""
-        advantages = []
-        gae = 0
-
-        for t in reversed(range(len(rewards))):
-            delta = rewards[t] + self.gamma * next_values[t] * (1 - dones[t]) - values[t]
-            gae = delta + self.gamma * self.lam * (1 - dones[t]) * gae
-            advantages.insert(0, gae)
-
-        advantages = torch.FloatTensor(advantages)
-        returns = advantages + torch.FloatTensor(values)
-        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
-
-        return advantages, returns
-
-    def update(self, states, actions, old_log_probs, advantages, returns):
-        """
-        PPO 更新
-
-        对同一批数据训练 n_epochs 轮
-        """
-        states = torch.FloatTensor(states)
-        actions = torch.LongTensor(actions)
-        old_log_probs = torch.FloatTensor(old_log_probs)
-
-        total_loss = 0
-
-        for _ in range(self.n_epochs):
-            # 打乱数据
-            indices = np.arange(len(states))
-            np.random.shuffle(indices)
-
-            # 分批训练
-            for start in range(0, len(states), self.batch_size):
-                end = start + self.batch_size
-                idx = indices[start:end]
-
-                # 前向传播
-                new_log_probs, values, entropy = self.policy.evaluate(
-                    states[idx], actions[idx]
-                )
-
-                # 计算比率
-                ratio = torch.exp(new_log_probs - old_log_probs[idx])
-
-                # 裁剪目标
-                surr1 = ratio * advantages[idx]
-                surr2 = torch.clamp(ratio, 1 - self.clip_epsilon,
-                                    1 + self.clip_epsilon) * advantages[idx]
-
-                # 计算损失
-                actor_loss = -torch.min(surr1, surr2).mean()
-                critic_loss = nn.MSELoss()(values, returns[idx])
-                entropy_loss = -entropy.mean()
-
-                loss = actor_loss + 0.5 * critic_loss + 0.01 * entropy_loss
-
-                # 反向传播
-                self.optimizer.zero_grad()
-                loss.backward()
-                nn.utils.clip_grad_norm_(self.policy.parameters(), max_norm=0.5)
-                self.optimizer.step()
-
-                total_loss += loss.item()
-
-        return total_loss / self.n_epochs
-```
-
-### 训练循环
-
-```python
-def train_ppo(env, ppo, num_iterations=1000, max_steps=2048):
-    """
-    PPO 训练循环
-
-    1. 采集轨迹
-    2. 计算 GAE
-    3. 多轮更新
-    """
-    episode_rewards = []
-
-    for iteration in range(num_iterations):
-        # 1. 采集轨迹
-        states, actions, rewards, dones, log_probs, values = [], [], [], [], [], []
-
-        state = env.reset()
-        for _ in range(max_steps):
-            action, log_prob, value = ppo.policy.get_action(state)
-            next_state, reward, done, _ = env.step(action)
-
-            states.append(state)
-            actions.append(action)
-            rewards.append(reward)
-            dones.append(done)
-            log_probs.append(log_prob.item())
-            values.append(value.item())
-
-            state = next_state
-            if done:
-                state = env.reset()
-
-        # 2. 计算 GAE
-        advantages, returns = ppo.compute_gae(
-            rewards, values, values[1:] + [0], dones
+    ''' PPO算法,采用截断方式 '''
+    def __init__(
+        self,
+        state_dim, # 状态的维度 = 4
+        hidden_dim, # 128
+        action_dim, # 2个动作
+        actor_lr, # 策略（演员）的学习率
+        critic_lr, # 价值网络（评论家）的学习率
+        lmbda, # λ，广义优势估计的超参数
+        epochs, # 训练轮数
+        eps, # ϵ，裁剪范围超参数(1-ϵ,1+ϵ)
+        gamma, # γ折扣因子
+        device # gpu or cpu
+    ):
+        # 演员是策略网络
+        self.actor = PolicyNet(
+            state_dim,
+            hidden_dim,
+            action_dim
+        ).to(device)
+        # 评论家是价值网络
+        self.critic = ValueNet(
+            state_dim,
+            hidden_dim
+        ).to(device)
+        self.actor_optimizer = torch.optim.Adam(
+            self.actor.parameters(),
+            lr=actor_lr
         )
+        self.critic_optimizer = torch.optim.Adam(
+            self.critic.parameters(),
+            lr=critic_lr
+        )
+        self.gamma = gamma # 折扣因子
+        self.lmbda = lmbda # GAE的超参数
+        self.epochs = epochs
+        self.eps = eps  # ϵ，截断范围
+        self.device = device
 
-        # 3. 多轮更新
-        loss = ppo.update(states, actions, log_probs, advantages, returns)
+	# 采取动作
+    def take_action(self, state):
+        state = torch.tensor([state], dtype=torch.float).to(self.device)
+        probs = self.actor(state)
+        action_dist = torch.distributions.Categorical(probs)
+        action = action_dist.sample()
+        return action.item()
 
-        if iteration % 10 == 0:
-            print(f"Iteration {iteration}, Loss: {loss:.4f}")
-
-    return episode_rewards
+	# 更新策略，每次智能体更新策略，都需要训练epochs=10轮
+	# 更新一次智能体，需要训练10轮的策略网络和价值网络
+    def update(self, transition_dict):
+        # s_t 当前的状态，每一个时刻的 **当时的状态** 的数组
+        states = torch.tensor(
+            transition_dict['states'],
+            dtype=torch.float
+        ).to(self.device)
+        # a_t 采取的动作，每一个时刻的采取的动作的数组
+        actions = torch.tensor(
+            transition_dict['actions']
+        ).view(-1, 1).to(self.device)
+        # r_t：t时刻获得的即时奖励组成的数组
+        rewards = torch.tensor(
+            transition_dict['rewards'],
+            dtype=torch.float
+        ).view(-1, 1).to(self.device)
+        # s_{t+1} 每个时刻的 **下一个状态** 组成的数组
+        next_states = torch.tensor(
+            transition_dict['next_states'],
+            dtype=torch.float
+        ).to(self.device)
+        # 是否结束标志位组成的数组
+        dones = torch.tensor(
+            transition_dict['dones'],
+            dtype=torch.float
+        ).view(-1, 1).to(self.device)
+        # td_target = R_t + γV(S_{t+1})
+        # 计算出每个时刻的单步TD目标组成的数组
+        td_target = rewards + \
+            self.gamma * self.critic(next_states) * (1 - dones)
+        # δ = R_t + γV(S_{t+1}) - V(S_t)
+        # 计算出每个时刻的单步TD误差组成的数组
+        td_delta = td_target - self.critic(states)
+        # A^{π_θ_old}_t
+        # `compute_advantage` 计算广义优势估计
+        # 每个时刻的GAE组成的数组[GAE_0, GAE_1, ..., GAE_n]
+        advantage = compute_advantage(
+            self.gamma,
+            self.lmbda,
+            td_delta.cpu()
+        ).to(self.device)
+        
+        # 旧策略采取动作的 **对数概率** log{π_θ_old(a_t|s_t)}
+        # 冻结（保存）一份 **旧策略** 的采取动作的对数概率的数组
+        old_log_probs = torch.log(
+            # todo: gather讲解
+            # 取出每个时刻的采取的那个具体动作的概率
+            # dim = 1, index = actions
+            # gather一般用在使用label标签从softmax后的数组中抽取对应的概率
+            self.actor(states).gather(1, actions)
+        ).detach()
+        # 训练epochs=10轮
+        for _ in range(self.epochs):
+            # 新策略采取动作的 **对数概率** log{π_θ_new(a_t|s_t)}
+            # 第1轮训练的时候，新旧策略模型是相同模型
+            # 新的策略用旧策略产生的轨迹的状态输出动作的概率
+            log_probs = torch.log(self.actor(states).gather(1, actions))
+            # 比率计算公式
+            ratio = torch.exp(log_probs - old_log_probs)
+            # surr --> surrogate替代
+            # p_t(θ)*优势，公式中逗号的左边项
+            surr1 = ratio * advantage
+            # 公式中逗号的右边项
+            surr2 = torch.clamp(
+                ratio, # p_t(θ)
+                1 - self.eps, # 1-ϵ = 0.8
+                1 + self.eps # 1+ϵ = 1.2
+            ) * advantage
+            # PPO损失函数
+            # 公式中min的实现 `-torch.min(surr1, surr2)`
+            # 策略的损失
+            # 每个时刻新旧策略采取动作a_t的比率的 **均值**
+            actor_loss = torch.mean(-torch.min(surr1, surr2))
+            # 价值网络的损失
+            # 每一步的TD误差的平均值
+            critic_loss = torch.mean(
+                F.mse_loss(self.critic(states), td_target.detach())
+            )
+            self.actor_optimizer.zero_grad()
+            self.critic_optimizer.zero_grad()
+            actor_loss.backward()
+            critic_loss.backward()
+            self.actor_optimizer.step()
+            self.critic_optimizer.step()
 ```
 
----
+```ad-tip
+title: 比率的计算
 
-## 训练技巧
+$$
+\frac{A}{B} = e^{\log{A}-\log{B}} = \frac{e^{\log A}}{e^{\log B}}
+$$
+```
 
-### 1. 梯度裁剪
+算法中计算广义优势估计的代码 `compute_advantage` 如下
 
 ```python
-# 防止梯度爆炸
-nn.utils.clip_grad_norm_(self.policy.parameters(), max_norm=0.5)
+def compute_advantage(gamma, lmbda, td_delta):
+    td_delta = td_delta.detach().numpy()
+    advantage_list = []
+    advantage = 0.0
+    for delta in td_delta[::-1]:
+        advantage = gamma * lmbda * advantage + delta
+        advantage_list.append(advantage)
+    advantage_list.reverse()
+    return torch.tensor(advantage_list, dtype=torch.float)
 ```
 
-### 2. 学习率调度
+![[ppo-algo-array.excalidraw|1000]]
+
+接下来，在倒立摆环境中训练 PPO 算法。
+
+## 训练循环
 
 ```python
-# 随着训练进行，逐渐减小学习率
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.95)
+actor_lr = 1e-3 # 策略网络的学习率
+critic_lr = 1e-2 # 价值网络的学习率
+num_episodes = 500 # 玩500个回合的游戏
+hidden_dim = 128
+gamma = 0.98 # 折扣因子
+lmbda = 0.95 # 广义优势估计用到的超参数λ
+epochs = 10 # 智能体每次更新策略需要训练10轮
+eps = 0.2 # ϵ = 0.2
+device = torch.device("cuda") \
+    if torch.cuda.is_available() \
+    else torch.device("cpu")
+
+env_name = 'CartPole-v0'
+env = gym.make(env_name)
+env.seed(0)
+torch.manual_seed(0)
+# state_dim = 4
+state_dim = env.observation_space.shape[0]
+# action_dim = 2
+action_dim = env.action_space.n
+# 初始化智能体
+agent = PPO(
+    state_dim,
+    hidden_dim,
+    action_dim,
+    actor_lr,
+    critic_lr,
+    lmbda,
+    epochs,
+    eps,
+    gamma,
+    device
+)
+# 训练策略
+return_list = train_on_policy_agent(env, agent, num_episodes)
 ```
 
-### 3. 优势标准化
+其中 `train_on_policy_agent` 如下
 
 ```python
-# 标准化优势，减少方差
-advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+def train_on_policy_agent(env, agent, num_episodes):
+    return_list = []
+    for i in range(10):
+        with tqdm(
+            total=int(num_episodes/10),
+            desc='Iteration %d' % i
+        ) as pbar:
+            # 循环 500 / 10 = 50
+            for i_episode in range(int(num_episodes/10)):
+                episode_return = 0
+                transition_dict = {
+	                'states': [],
+	                'actions': [],
+	                'next_states': [],
+	                'rewards': [],
+	                'dones': []
+	            }
+                state = env.reset()
+                done = False
+                # 采样一条轨迹，记录了每个动作的相关信息
+                # 注意：这条轨迹会被反复使用10次，样本利用率比较高
+                while not done:
+                    # 每执行一次动作，就将相关信息添加到对应的数组
+                    action = agent.take_action(state)
+                    next_state, reward, done, _ = env.step(action)
+                    transition_dict['states'].append(state)
+                    transition_dict['actions'].append(action)
+                    transition_dict['next_states'].append(next_state)
+                    transition_dict['rewards'].append(reward)
+                    transition_dict['dones'].append(done)
+                    state = next_state
+                    episode_return += reward
+                return_list.append(episode_return)
+                # 更新策略 ---> 冻结一份旧策略的概率，然后更新10次策略网络
+                agent.update(transition_dict)
+                if (i_episode+1) % 10 == 0:
+                    pbar.set_postfix({
+                        'episode': '%d' % (
+                            num_episodes/10 * i + i_episode+1
+                        ),
+                        'return': '%.3f' % np.mean(return_list[-10:])
+                    })
+                pbar.update(1)
+    return return_list
 ```
 
-### 4. 早停策略
+可视化一下训练结果
 
 ```python
-# 如果 KL 散度太大，提前停止更新
-kl_div = (old_log_probs - new_log_probs).mean()
-if kl_div > 0.02:
-    break
+episodes_list = list(range(len(return_list)))
+plt.plot(episodes_list, return_list)
+plt.xlabel('Episodes')
+plt.ylabel('Returns')
+plt.title('CartPole-v0')
+plt.show()
 ```
 
----
+![[使用PPO玩倒立摆的收益变化图.png]]
 
-## 关键要点
+```ad-danger
+PPO 算法是 OpenAI 使用的默认算法。
+```
 
-1. **Actor-Critic 架构**：共享特征层，减少计算开销
-2. **GAE 计算**：平衡偏差和方差
-3. **PPO 损失函数**：三重损失，平衡策略、价值、探索
-4. **多轮更新**：提高样本效率
-5. **训练技巧**：梯度裁剪、学习率调度、优势标准化
+## 反向传播算法
 
----
-
-## 完整代码
-
-完整的 PPO 实现可以在 GitHub 仓库的 `code/ppo.py` 文件中找到。
+![[backprop.excalidraw|1000]]

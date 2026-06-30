@@ -1,279 +1,122 @@
-# 直接偏好优化 (DPO)
+Qwen2.5-3B ---> Qwen2.5-3B-Instruct ---> Qwen2.5-3B-Instruct-RLHF
+![[5.1.excalidraw|1000]]
 
-## 为什么需要 DPO？
+**监督微调（Supervised Fine-Tuning，SFT）** 通常也是采用“预测下一个词（predict next token）”的训练方式。
 
-传统的 RLHF（基于人类反馈的强化学习）流程：
+- **基础模型训练**：大多数语言模型（如GPT系列）本身就是通过自回归方式训练的，即在给定上下文的情况下预测下一个词（token）。
+- **监督微调（SFT）**：在微调阶段，模型通常会使用带有标签的输入-输出对进行训练，比如对话数据、问答对等。训练目标依然是让模型在给定输入（上下文）的条件下，预测正确的下一个词。
 
-1. **训练奖励模型**：从人类偏好数据中学习奖励函数
-2. **强化学习优化**：用 PPO 优化策略，最大化奖励
+换句话说，SFT通过 **有监督的数据** 指导模型生成更符合特定任务或风格的输出，但训练目标仍然是最大化正确预测下一个词的概率。
 
-这个流程有两个问题：
+| 训练阶段       | 训练方式        | 目标              |
+| ---------- | ----------- | --------------- |
+| 预训练        | 自回归预测下一个词   | 学习语言的通用统计规律     |
+| 监督微调 (SFT) | 给定输入，预测下一个词 | 让模型生成更符合特定任务的输出 |
 
-1. **奖励模型可能不准确**：人类偏好数据有限，奖励模型可能过拟合
-2. **PPO 训练不稳定**：需要调参，容易崩溃
+所以通过SFT微调基础模型，可以让大模型输出我们喜欢的回答。
 
-**DPO**（Direct Preference Optimization）直接从偏好数据优化策略，**不需要训练奖励模型**。
-
----
-
-## 核心思想
-
-### 传统 RLHF 的目标
-
-$$\max_{\pi_\theta} E_{x \sim D, y \sim \pi_\theta(y|x)}[R(x, y)] - \beta \cdot KL(\pi_\theta || \pi_{ref})$$
-
-其中：
-- $R(x, y)$：奖励函数
-- $\pi_{ref}$：参考策略（通常是 SFT 模型）
-- $\beta$：KL 惩罚系数
-
-### 最优策略的闭式解
-
-这个优化问题有闭式解：
-
-$$\pi^*(y|x) = \frac{1}{Z(x)} \pi_{ref}(y|x) \exp\left(\frac{R(x, y)}{\beta}\right)$$
-
-其中 $Z(x) = \sum_y \pi_{ref}(y|x) \exp\left(\frac{R(x, y)}{\beta}\right)$ 是归一化常数。
-
-### 关键洞察
-
-从最优策略公式反解出奖励函数：
-
-$$R(x, y) = \beta \log \frac{\pi^*(y|x)}{\pi_{ref}(y|x)} + \beta \log Z(x)$$
-
-**这个公式的意义**：奖励函数可以用策略和参考策略的比率来表示！
-
----
-
-## 从奖励到偏好
-
-### Bradley-Terry 模型
-
-人类偏好可以用 Bradley-Terry 模型表示：
-
-$$P(y_w \succ y_l | x) = \sigma(R(x, y_w) - R(x, y_l))$$
-
-其中：
-- $y_w$：偏好的响应（winner）
-- $y_l$：非偏好的响应（loser）
-- $\sigma$：sigmoid 函数
-
-### 代入奖励公式
-
-把 $R(x, y) = \beta \log \frac{\pi^*(y|x)}{\pi_{ref}(y|x)} + \beta \log Z(x)$ 代入：
-
-$$P(y_w \succ y_l | x) = \sigma\left(\beta \log \frac{\pi^*(y_w|x)}{\pi_{ref}(y_w|x)} - \beta \log \frac{\pi^*(y_l|x)}{\pi_{ref}(y_l|x)}\right)$$
-
-注意：$\beta \log Z(x)$ 在相减时消掉了！
-
----
-
-## DPO 损失函数
-
-### 推导
-
-我们想最大化偏好数据的似然：
-
-$$\max_\theta \sum_{(x, y_w, y_l)} \log P(y_w \succ y_l | x)$$
-
-代入 Bradley-Terry 模型：
-
-$$\max_\theta \sum_{(x, y_w, y_l)} \log \sigma\left(\beta \log \frac{\pi_\theta(y_w|x)}{\pi_{ref}(y_w|x)} - \beta \log \frac{\pi_\theta(y_l|x)}{\pi_{ref}(y_l|x)}\right)$$
-
-### 最终公式
-
-DPO 损失函数：
-
-$$L(\theta) = -E_{(x, y_w, y_l)}\left[\log \sigma\left(\beta \log \frac{\pi_\theta(y_w|x)}{\pi_{ref}(y_w|x)} - \beta \log \frac{\pi_\theta(y_l|x)}{\pi_{ref}(y_l|x)}\right)\right]$$
-
-### 直观理解
-
-- 如果 $\beta \log \frac{\pi_\theta(y_w|x)}{\pi_{ref}(y_w|x)} > \beta \log \frac{\pi_\theta(y_l|x)}{\pi_{ref}(y_l|x)}$：
-  - $\sigma(...)$ 接近 1
-  - $-\log \sigma(...)$ 接近 0
-  - 损失小
-
-- 如果 $\beta \log \frac{\pi_\theta(y_w|x)}{\pi_{ref}(y_w|x)} < \beta \log \frac{\pi_\theta(y_l|x)}{\pi_{ref}(y_l|x)}$：
-  - $\sigma(...)$ 接近 0
-  - $-\log \sigma(...)$ 接近 ∞
-  - 损失大
-
-**效果**：让策略更倾向于生成偏好响应，而不是非偏好响应。
-
----
-
-## 代码实现
-
-### 计算 log 概率
-
-```python
-import torch
-import torch.nn as nn
-from transformers import AutoModelForCausalLM, AutoTokenizer
-
-def compute_logprobs(model, input_ids, labels):
-    """
-    计算序列的 log 概率
-
-    log π(y|x) = ∑_t log π(y_t | y_{<t}, x)
-    """
-    outputs = model(input_ids=input_ids, labels=labels)
-    logits = outputs.logits[:, :-1, :]  # 去掉最后一个位置
-    labels = labels[:, 1:]  # 去掉第一个位置
-
-    # 计算 log softmax
-    log_probs = torch.log_softmax(logits, dim=-1)
-
-    # 提取每个 token 的 log 概率
-    token_log_probs = log_probs.gather(2, labels.unsqueeze(2)).squeeze(2)
-
-    # 返回序列的平均 log 概率
-    return token_log_probs.mean(dim=-1)
+```ad-danger
+但是SFT无法让大模型 **不输出我们不喜欢的回答** 。
 ```
 
-### DPO 损失函数
+因为SFT的训练目标是“预测下一个token”，它本质上是拟合训练数据中的分布。如果训练数据中存在不理想的回答，模型可能仍然学到这些模式。
 
-```python
-def dpo_loss(model, ref_model, tokenizer, prompt, chosen, rejected, beta=0.1):
-    """
-    DPO 损失函数
+所以我们要使用 “强化学习” 来对大语言模型进行微调，这就是“基于人类反馈的强化学习”。
 
-    L(θ) = -E[log σ(β log π_θ(y_w|x)/π_ref(y_w|x) - β log π_θ(y_l|x)/π_ref(y_l|x))]
-    """
-    # 编码输入
-    chosen_inputs = tokenizer(prompt + chosen, return_tensors="pt")
-    rejected_inputs = tokenizer(prompt + rejected, return_tensors="pt")
-
-    # 当前策略的 log 概率
-    chosen_logprobs = compute_logprobs(
-        model, chosen_inputs["input_ids"], chosen_inputs["input_ids"]
-    )
-    rejected_logprobs = compute_logprobs(
-        model, rejected_inputs["input_ids"], rejected_inputs["input_ids"]
-    )
-
-    # 参考策略的 log 概率
-    with torch.no_grad():
-        ref_chosen_logprobs = compute_logprobs(
-            ref_model, chosen_inputs["input_ids"], chosen_inputs["input_ids"]
-        )
-        ref_rejected_logprobs = compute_logprobs(
-            ref_model, rejected_inputs["input_ids"], rejected_inputs["input_ids"]
-        )
-
-    # 计算 log 比率
-    chosen_logratios = chosen_logprobs - ref_chosen_logprobs
-    rejected_logratios = rejected_logprobs - ref_rejected_logprobs
-
-    # DPO 损失
-    logits = beta * (chosen_logratios - rejected_logratios)
-    loss = -torch.log(torch.sigmoid(logits)).mean()
-
-    return loss
+```ad-note
+RLHF: **R**einforcement **L**earning From **H**uman **F**eedback
 ```
 
-### 训练循环
+当我们谈论大语言模型（LLM）的强化学习时，我们进入了一个完全不同的世界。我们不再训练智能体在倒立摆环境中的表现，而是对预训练好的大语言模型进行微调，使其符合人类的偏好。该模型不会与外部环境交互——它本质上是在探索自身的输出空间。
 
-```python
-def train_dpo():
-    """DPO 训练流程"""
-    # 加载模型
-    model = AutoModelForCausalLM.from_pretrained("gpt2")
-    ref_model = AutoModelForCausalLM.from_pretrained("gpt2")
-    tokenizer = AutoTokenizer.from_pretrained("gpt2")
+正如OpenAI和其他科研人员所发现的，这种方法对于将原始语言模型转化为辅助系统至关重要。正如IBM研究人员指出的那样，“RLHF特别适合于目标复杂、定义不明确或难以指定的任务。”毕竟，如何用数学来定义“乐于助人”或“诚实”这样的概念呢？
 
-    # 优化器
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-6)
+这里的根本转变是：
 
-    # 训练数据
-    data = [
-        {
-            "prompt": "什么是机器学习？",
-            "chosen": "机器学习是人工智能的一个分支，它让计算机能够从数据中学习，而不需要显式编程。",
-            "rejected": "机器学习就是让机器自己学习。"
-        }
-    ]
+1. 我们正在优化大语言模型以适应人类的偏好，而不是对环境的掌控
+2. 我们的数据来自人类的判断，而不是环境互动
+3. 我们需要在奖励最大化与保持接近原始预训练行为之间取得平衡
 
-    # 训练循环
-    for epoch in range(10):
-        for batch in data:
-            # 计算损失
-            loss = dpo_loss(
-                model, ref_model, tokenizer,
-                batch["prompt"], batch["chosen"], batch["rejected"]
-            )
+这种平衡行为使得 LLM 强化学习特别棘手，但也特别令人着迷！
 
-            # 反向传播
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
-            print(f"Epoch {epoch}, Loss: {loss.item():.4f}")
+```ad-note
+别看上面的话很抽象，其实微调大语言模型和训练倒立摆环境中的推车的原理是一样的！
 ```
 
----
+## RLHF中的关键技术
 
-## DPO vs PPO
+![[5.6.excalidraw|1000]]
 
-### 优势
+## 近端策略优化（PPO）
 
-| 特性 | PPO | DPO |
-|------|-----|-----|
-| 奖励模型 | 需要 | 不需要 |
-| 训练复杂度 | 高 | 低 |
-| 数据需求 | 在线采样 | 离线偏好数据 |
-| 稳定性 | 需要调参 | 更稳定 |
-| 实现难度 | 难 | 容易 |
+PPO 是 LLM 强化学习对齐技术的 ==重量级冠军==，因 OpenAI 开发的 InstructGPT 和 ChatGPT 而闻名。PPO 于 2017 年开发，解决了强化学习中的一个关键挑战：如何在不破坏训练稳定性的情况下进行有意义的更新。
 
-### 劣势
+PPO 成功的秘诀在于其“近端”特性——它对策略进行保守更新，防止模型在单次迭代中发生过大变化。这是通过其目标函数中巧妙的裁剪机制实现的：
 
-| 特性 | PPO | DPO |
-|------|-----|-----|
-| 探索能力 | 强 | 弱 |
-| 适用场景 | 通用 | 有偏好数据时 |
-| 理论保证 | 更强 | 较弱 |
+$$
+J_{PPO}(\theta)=\mathbb{E}\left[{\min\left({\frac{\pi_\theta(a|s)}{\pi_{\theta_{old}}(a|s)}}A,\text{clip}\left({\frac{\pi_\theta(a|s)}{\pi_{\theta_{old}}(a|s)},1-\epsilon,1+\epsilon}\right)A\right)}\right]
+$$
 
----
+![[5.9.excalidraw|1000]]
 
-## 深入讨论
+![[5.10.excalidraw|1000]]
 
-### 为什么 DPO 更稳定？
+![[5.11.excalidraw|1000]]
 
-1. **没有奖励模型误差传播**：直接从偏好数据学习，不需要训练奖励模型
-2. **没有在线采样**：使用离线数据，不需要与环境交互
-3. **损失函数简单**：只有交叉熵损失，没有复杂的策略梯度
+![[5.12.excalidraw|1000]]
+![[5.13.excalidraw|1000]]
 
-### $\beta$ 的作用
 
-- $\beta$ 控制策略与参考策略的差异
-- $\beta$ 越大：策略越接近参考策略
-- $\beta$ 越小：策略越远离参考策略
+通过限制新旧策略之间的比例（通常在 1±0.2 以内），PPO 可以确保模型在训练过程中不会偏离目标。
 
-### 什么时候用 DPO？
+PPO 一直是实现人类反馈强化学习 (RLHF) 的首选算法，该算法遵循以下三个步骤：
 
-1. **有高质量偏好数据**：人类标注的偏好对
-2. **计算资源有限**：不想训练奖励模型
-3. **追求稳定性**：不想花时间调参
+1. 从预训练模型开始
+2. 根据人类偏好训练奖励模型
+3. 使用PPO微调LLM，来最大化奖励，同时保持接近原来的LLM。
 
-### 什么时候用 PPO？
+## 直接偏好优化（DPO）
 
-1. **没有偏好数据**：需要在线采样
-2. **需要探索**：任务复杂，需要探索
-3. **追求最优性能**：愿意花时间调参
+![[7.1.excalidraw|1000]]
 
----
+目标函数里面的也可以写成
 
-## 关键要点
+$$
+\log \frac{\pi_{\theta}(y_{w}|x)}{\pi_{\theta}(y_{l}|x)} - \log \frac{\pi_{\text{ref}}(y_{w}|x)}{\pi_{\text{ref}}(y_{l}|x)}=
+\log \frac{\pi_{\theta}(y_{w}|x)}{\pi_{\text{ref}}(y_{w}|x)} - \log \frac{\pi_{\theta}(y_{l}|x)}{\pi_{\text{ref}}(y_{l}|x)}
+$$
 
-1. **DPO 直接从偏好数据优化策略**，不需要奖励模型
-2. **核心公式**：$L(\theta) = -E[\log \sigma(\beta \log \frac{\pi_\theta(y_w|x)}{\pi_{ref}(y_w|x)} - \beta \log \frac{\pi_\theta(y_l|x)}{\pi_{ref}(y_l|x)})]$
-3. **更稳定、更简单**，但探索能力较弱
-4. **适用于**有高质量偏好数据的场景
+如果说 PPO 是一位谨慎的外科医生，能够精准地进行手术，那么 DPO 则是一位效率专家，他找到了通往同一目标的捷径。DPO 于 2023 年在一篇题为《直接偏好优化：你的语言模型其实是一个奖励模型》的论文中首次提出，它彻底消除了对单独奖励模型的需求。
 
----
+DPO 的精妙之处在于其数学洞察力：奖励函数与最优策略之间存在直接映射。通过利用这种关系，DPO 将强化学习问题转化为基于人类偏好数据的更简单的分类问题。
 
-## 延伸阅读
+与传统的三步 RLHF 流程不同，DPO 只需一个训练阶段即可实现相同的目标。这就像跳过中间环节，直接到达源头。
 
-1. **RLHF**：传统的基于人类反馈的强化学习
-2. **IPO**：Identity Preference Optimization，DPO 的改进版本
-3. **KTO**：Kahneman-Tversky Optimization，不需要成对偏好数据
+DPO 对从业者特别有吸引力的原因是：
+
+1. **简单** ：无需训练单独的奖励模型
+2. **效率** ：无需在训练期间进行昂贵的采样
+3. **稳定性** ：组件越少，出错的可能性就越小
+4. **性能** ：在控制输出属性方面，通常与PPO-RLHF相当或超过PPO-RLHF
+
+## 组相对策略优化（GRPO）
+
+![[5.7.excalidraw|1000]]
+
+![[5.8.excalidraw|1000]]
+
+
+现在，如果我们能将 PPO 的可靠性与更高的效率以及对推理能力提升的专注结合起来，会怎么样呢？GRPO 应运而生，它是强化学习领域的最新成果之一，由 DeepSeek 开发，并用于训练其令人印象深刻的 DeepSeek-Math 和 DeepSeek-R1 模型。
+
+GRPO 建立在 PPO 的基础上，但引入了几项巧妙的修改：
+
+1. GRPO去掉了价值函数模型，减少了内存开销。
+2. GRPO评估输出的一组回答而不是单个token。
+3. GRPO直接将KL散度纳入损失函数。
+
+这种基于组（Group）的方法尤其巧妙。GRPO 不是单独评估每个token，而是将完整的答案作为一个整体来看待 ⟶ 这是一种评估推理能力更自然的方式，其中整个解答过程都很重要，而不仅仅是单个步骤。
+
+用 AWS 社区文章的话来说，“GRPO 用于计算优势的组相对方式与奖励模型的比较性质非常吻合，因为奖励模型通常是在同一问题的输出比较数据集上进行训练的。”
+
+![[rl-algorisms.excalidraw|1000]]
+

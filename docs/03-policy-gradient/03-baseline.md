@@ -1,217 +1,158 @@
-# 带基线的策略梯度法
 
-## 为什么需要基线？
+## 1. 策略梯度法的推导
 
-### 方差问题
+当 $J(\theta)=\mathbb{E}_{\tau\sim\pi_\theta}\left\lbrack{G(\tau)}\right\rbrack$ 时，其梯度如下面的式子所示。
 
-原始策略梯度的梯度估计：
+$$
+\nabla_\theta{J_\theta}=\mathbb{E}_{\tau\sim\pi_\theta}\left\lbrack{\sum_{t=0}^TG(\tau)\nabla_\theta\log\pi_\theta(A_t|S_t)}\right\rbrack
+$$
 
-$$\nabla_\theta J(\theta) = E \left[ \sum_t \nabla_\theta \log \pi_\theta(a_t|s_t) \cdot G_t \right]$$
+下面对上面的式子进行证明。$(f\cdot g)' = f'g + fg'$ 。
 
-问题：$G_t$ 的方差很大，导致梯度估计不稳定。
+$\nabla_{\theta}J(\theta) = \frac{\partial J(θ)}{\partial θ}$
 
-### 基线的作用
+$$
+\begin{split}
+\nabla_\theta{J(\theta)} &= \nabla_\theta\mathbb{E}_{\tau\sim\pi_\theta}\left\lbrack{G(\tau)}\right\rbrack \\
+&= \nabla_\theta\sum_\tau{\Pr(\tau|\theta)G(\tau)} \quad\text{（展开期望值）} \\
+&= \sum_\tau\nabla_\theta(\Pr(\tau|\theta)G(\tau)) \quad\text{（将}\nabla_\theta\text{移动到}\sum\text{中）} \\
+&= \sum_\tau\left\lbrace{G(\tau)\nabla_\theta\Pr(\tau|\theta)+\Pr(\tau|\theta)\nabla_\theta{G(\tau)}}\right\rbrace \quad\text{（积的微分）} \\
+&= \sum_\tau{G(\tau)\nabla_\theta\Pr(\tau|\theta)} \quad\text{（}\nabla_\theta{G(\tau)}\text{永远为0）} \\
+&= \sum_\tau G(\tau)\Pr(\tau|\theta)\frac{\nabla_\theta\Pr(\tau|\theta)}{\Pr(\tau|\theta)} \quad\text{（乘以}{\frac{\Pr(\tau|\theta)}{\Pr(\tau|\theta)}}\text{）} \\
+&= \sum_\tau G(\tau)\Pr(\tau|\theta)\nabla_\theta\log\Pr(\tau|\theta) \quad\text{（}\log\text{梯度的技巧）} \\
+&= \mathbb{E}_{\tau\sim\pi_\theta}\left\lbrack{G(\tau)\nabla_\theta\log\Pr(\tau|\theta)}\right\rbrack
+\end{split}\tag{1}
+$$
 
-引入基线 $b(s_t)$：
+这里对 “log梯度的技巧” 进行说明。这个技巧利用了以下等式。
 
-$$\nabla_\theta J(\theta) = E \left[ \sum_t \nabla_\theta \log \pi_\theta(a_t|s_t) \cdot (G_t - b(s_t)) \right]$$
+$$
+\nabla_\theta\log\Pr(\tau|\theta)=\frac{\nabla_\theta\Pr(\tau|\theta)}{\Pr(\tau|\theta)}
+$$
 
-**关键性质**：减去基线不会改变梯度的期望，但可以减少方差。
+> [!NOTE]
+> $$\log(f(x))'=\frac{f'(x)}{f(x)}$$
 
----
+根据上面的式子，我们就知道
 
-## 数学证明
+$$
+\nabla_\theta\Pr(\tau|\theta)=\Pr(\tau|\theta)\nabla_\theta\log\Pr(\tau|\theta)
+$$
 
-### 为什么基线不影响期望？
+这就是著名的 **log 梯度的技巧** 。是机器学习领域常用的数学式的变形形式。
 
-$$E \left[ \nabla_\theta \log \pi_\theta(a_t|s_t) \cdot b(s_t) \right] = 0$$
+接下来，我们将利用以下等式进一步展开$(1)$。
 
-证明：
+$$
+\begin{split}
+\Pr(\tau|\theta) &= p(S_0)\pi_\theta(A_0|S_0)p(S_1|S_0,A_0)\cdots\pi_\theta(A_T|S_T)p(S_{T+1}|S_T,A_T) \\
+&= p(S_0)\prod_{t=0}^T\pi_\theta(A_t|S_t)p(S_{t+1}|S_t,A_t)
+\end{split}
+$$
 
-$$E_{a_t \sim \pi_\theta} \left[ \nabla_\theta \log \pi_\theta(a_t|s_t) \cdot b(s_t) \right]$$
+这里，$p(S_0)$ 表示初始状态 $S_0$ 的概率。上面的式子表明，得到轨迹 $\tau$ 的概率可以用初始状态的概率、策略以及下一个状态的迁移概率的乘积来表示。另外，我们可以用下面的式子来表示 $\log\Pr(\tau|\theta)$ 。
 
-$$= \sum_{a_t} \pi_\theta(a_t|s_t) \cdot \frac{\nabla_\theta \pi_\theta(a_t|s_t)}{\pi_\theta(a_t|s_t)} \cdot b(s_t)$$
+$$
+\log\Pr(\tau|\theta)=\log{p(S_0)} + \sum_{t=0}^T\log{p(S_{t+1}|S_t,A_t)} + \sum_{t=0}^T\log\pi_\theta(A_t|S_t)
+$$
 
-$$= \sum_{a_t} \nabla_\theta \pi_\theta(a_t|s_t) \cdot b(s_t)$$
+由于 $\log xy = \log x + \log y$ ，所以可以像上面的式子那样表示为和的形式。基于上面的式子，可以将 $\nabla_\theta{\log\Pr(\tau|\theta)}$ 展开为如下形式。
 
-$$= b(s_t) \cdot \nabla_\theta \sum_{a_t} \pi_\theta(a_t|s_t)$$
+$$
+\begin{split}
+\nabla_\theta\log\Pr(\tau|\theta) &= \nabla_\theta\left\lbrace\log{p(S_0)} + \sum_{t=0}^T\log{p(S_{t+1}|S_t,A_t)} + \sum_{t=0}^T\log\pi_\theta(A_t|S_t)\right\rbrace \\
+&= \nabla_\theta\sum_{t=0}^T\log\pi_\theta(A_t|S_t)
+\end{split}
+$$
 
-$$= b(s_t) \cdot \nabla_\theta 1 = 0$$
+$\nabla_\theta$ 是对 $\theta$ 的梯度。与 $\theta$ 无关的元素的梯度 $\nabla_\theta\log p(S_0)$ 和 $\nabla_\theta\sum_{t=0}^T\log{p(S_{t+1}|S_t,A_t)}$ 为 0 。因此，从上面的式子可以得到下列式子。
 
----
+$$
+\begin{split}
+\nabla_\theta{J(\theta)}&=\mathbb{E}_{\tau\sim\pi_\theta}\left\lbrack{G(\tau)\nabla_\theta\log\Pr(\tau|\theta)}\right\rbrack \\
+&= \mathbb{E}_{\tau\sim\pi_\theta}\left\lbrack{\sum_{t=0}^TG(\tau)\nabla_\theta\log\pi_\theta(A_t|S_t)}\right\rbrack
+\end{split}
+$$
 
-## 常用基线选择
+这样我们就完成了 $\nabla_\theta{J(\theta)}$ 的推导。
 
-### 1. 状态价值函数 $V(s)$
+```ad-danger
+title: 从极大似然估计的角度看策略梯度
 
-最常用的基线：
+$$
+\begin{aligned}
+J(θ) &= \sum_{t=0}^TG(\tau)\log \pi_{\theta}(A_{t}|S_{t}) \\
+&= G(\tau)\log{\left(\prod_{t=0}^T\pi_{\theta}(A_{t}|S_{t})\right)}
+\end{aligned}
+$$
 
-$$b(s_t) = V_{\phi}(s_t)$$
-
-此时优势函数为：
-
-$$A_t = G_t - V_{\phi}(s_t)$$
-
-### 2. 移动平均回报
-
-```python
-class MovingAverageBaseline:
-    def __init__(self, window_size=100):
-        self.returns = []
-        self.window_size = window_size
-
-    def update(self, G):
-        self.returns.append(G)
-        if len(self.returns) > self.window_size:
-            self.returns.pop(0)
-
-    def get_baseline(self):
-        return np.mean(self.returns)
+最大化目标就会提升某些状态对应的动作的概率。
 ```
 
-### 3. 回报均值
+## 2. 基线的推导
 
-```python
-# 对当前batch的回报取均值作为基线
-baseline = returns.mean()
-advantages = returns - baseline
-```
+$$
+\begin{split}
+\nabla_\theta J(\theta) &= \mathbb{E}_{\tau\sim\pi_\theta}\left\lbrack{\sum_{t=0}^TG_t\nabla_\theta\log\pi_\theta(A_t|S_t)}\right\rbrack \\
+&= \mathbb{E}_{\tau\sim\pi_\theta}\left\lbrack{\sum_{t=0}^T(G_t-b(S_t))\nabla_\theta\log\pi_\theta(A_t|S_t)}\right\rbrack \\
+&= \mathbb{E}_{\tau\sim \pi_{\theta}}\left[ \sum_{t=0}^TG_{t}\nabla_{\theta}\log \pi_{\theta}(A_{t}|S_{t})\right] -\mathbb{E}_{\tau\sim \pi_{\theta}}\left[ \sum_{t=0}^Tb(S_{t})\nabla_{\theta}\log \pi_{\theta}(A_{t}|S_{t}) \right] \\
+&= \mathbb{E}_{\tau\sim\pi_\theta}\left\lbrack{\sum_{t=0}^TG_t\nabla_\theta\log\pi_\theta(A_t|S_t)}\right\rbrack \\
+\end{split}
+$$
 
----
+如上面的式子所示，我们可以使用 $G_t-b(S_t)$ 代替 $G_t$ 。$b(S_t)$ 是 **任何函数** ，我们称之为“基线”。下面进行上式的推导。
 
-## 代码实现
+首先，证明以下式子成立。
 
-### 带基线的 REINFORCE
+$$
+\mathbb{E}_{x\sim P_\theta}\left\lbrack{\nabla_\theta\log P_\theta(x)}\right\rbrack = 0 \tag{1}
+$$
 
-```python
-import torch
-import torch.nn as nn
-import torch.optim as optim
-from torch.distributions import Categorical
-import gym
-import numpy as np
+这里假设随机变量 $x$ 是基于概率分布 $P_\theta(x)$ 生成的。$P_\theta(x)$ 会根据参数 $\theta$ 改变概率分布的形状。此时有以下式子成立。
 
-class PolicyNetwork(nn.Module):
-    def __init__(self, state_dim, action_dim, hidden_dim=128):
-        super().__init__()
-        self.fc1 = nn.Linear(state_dim, hidden_dim)
-        self.fc2 = nn.Linear(hidden_dim, action_dim)
+$$
+\sum_xP_\theta(x)=1
+$$
 
-    def forward(self, state):
-        x = torch.relu(self.fc1(state))
-        x = self.fc2(x)
-        return torch.softmax(x, dim=-1)
+由于 $P_\theta(x)$ 是概率分布，因此所有 $x$ 的值的和为 1 。然后，求这个式子的梯度。
 
-    def get_action(self, state):
-        probs = self.forward(torch.FloatTensor(state))
-        dist = Categorical(probs)
-        action = dist.sample()
-        return action.item(), dist.log_prob(action)
+$$
+\nabla_\theta\sum_xP_\theta(x)=\nabla_\theta 1 = 0
+$$
 
+接下来，使用log梯度的技巧将式子展开，过程如下所示。
 
-class ValueNetwork(nn.Module):
-    """基线网络（状态价值函数）"""
-    def __init__(self, state_dim, hidden_dim=128):
-        super().__init__()
-        self.fc1 = nn.Linear(state_dim, hidden_dim)
-        self.fc2 = nn.Linear(hidden_dim, 1)
+$$
+\begin{split}
+0 &= \nabla_\theta\sum_xP_\theta(x) \\
+&= \sum_x\nabla_\theta P_\theta(x) \\
+&= \sum_xP_\theta(x)\nabla_\theta\log P_\theta(x) \\
+&= \mathbb{E}_{x\sim P_\theta}\left\lbrack{\nabla_\theta\log P_\theta(x)}\right\rbrack
+\end{split}
+$$
 
-    def forward(self, state):
-        x = torch.relu(self.fc1(state))
-        x = self.fc2(x)
-        return x.squeeze(-1)
+证明(1)完毕。接下来将证明的式子用于我们的问题。具体来说，用 $A_t$ 代替(1)中的 $x$ ，然后使用 $\pi_\theta(\cdot|S_t)$ 代替 $P_\theta(\cdot)$ 。这样就可以得到以下式子。
 
+$$
+\mathbb{E}_{A_t\sim\pi_\theta}\left\lbrack{\nabla_\theta\log\pi_\theta(A_t|S_t)}\right\rbrack = 0
+$$
 
-def reinforce_with_baseline(env, policy, value_net, optimizer_policy,
-                            optimizer_value, gamma=0.99, num_episodes=1000):
-    """带基线的 REINFORCE"""
-    episode_rewards = []
+上面的式子是对 $A_t$ 的期望值。因此，我们可以像下面的式子那样，将任何函数 $b(S_t)$ 放入期望值中。$E[x]=0\to E[cx]=c\cdot 0=0$ 。
 
-    for episode in range(num_episodes):
-        states = []
-        log_probs = []
-        rewards = []
+$$
+\mathbb{E}_{A_t\sim\pi_\theta}\left\lbrack{b(S_t)\nabla_\theta\log\pi_\theta(A_t|S_t)}\right\rbrack = 0 \tag{2}
+$$
 
-        state = env.reset()
-        done = False
+$b(S_t)$ 是以 $S_t$ 为参数的函数，即使 $A_t$ 发生变化，它的值也不会改变。由于式子(2)是对 $A_t$ 的期望值，因此即使在期望值中加入函数 $b(S_t)$ ，等式也成立。
 
-        while not done:
-            action, log_prob = policy.get_action(state)
-            next_state, reward, done, _ = env.step(action)
+> [!NOTE]
+> 动作 $A_t$ 的变化会导致收益 $G_t$ 的变化，因此以下式子不成立。
+> $$\mathbb{E}_{A_t\sim\pi_\theta}\left\lbrack{G_t\nabla_\theta\log\pi_\theta(A_t|S_t)}\right\rbrack = 0$$
 
-            states.append(state)
-            log_probs.append(log_prob)
-            rewards.append(reward)
-            state = next_state
+式子(2)在整个 $t=0\sim T$ 的范围都成立，所以可以得到以下式子。
 
-        # 计算回报
-        returns = compute_returns(rewards, gamma)
+$$
+\mathbb{E}_{A_t\sim\pi_\theta}\left\lbrack{\sum_{t=0}^Tb(S_t)\nabla_\theta\log\pi_\theta(A_t|S_t)}\right\rbrack = 0
+$$
 
-        # 计算基线（状态价值）
-        states_tensor = torch.FloatTensor(np.array(states))
-        values = value_net(states_tensor)
-
-        # 计算优势：A_t = G_t - V(s_t)
-        advantages = returns - values.detach()
-        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
-
-        # 策略损失
-        policy_loss = 0
-        for log_prob, advantage in zip(log_probs, advantages):
-            policy_loss -= log_prob * advantage
-
-        # 价值网络损失
-        value_loss = nn.MSELoss()(values, returns)
-
-        # 更新策略
-        optimizer_policy.zero_grad()
-        policy_loss.backward()
-        optimizer_policy.step()
-
-        # 更新价值网络
-        optimizer_value.zero_grad()
-        value_loss.backward()
-        optimizer_value.step()
-
-        episode_rewards.append(sum(rewards))
-
-        if episode % 100 == 0:
-            print(f"Episode {episode}, Avg Reward: {np.mean(episode_rewards[-100:]):.2f}")
-
-    return episode_rewards
-```
-
----
-
-## 基线的方差减少效果
-
-### 理论分析
-
-假设我们有 $N$ 个样本，梯度估计的方差为：
-
-$$Var[\hat{g}] = \frac{1}{N} Var[\nabla_\theta \log \pi_\theta(a|s) \cdot (G - b)]$$
-
-最优基线：
-
-$$b^* = \frac{E[(\nabla_\theta \log \pi_\theta)^2 \cdot G]}{E[(\nabla_\theta \log \pi_\theta)^2]}$$
-
-### 实验对比
-
-```python
-# 无基线
-rewards_basic = reinforce(env, policy, optimizer)
-
-# 有基线
-rewards_baseline = reinforce_with_baseline(env, policy, value_net, ...)
-
-# 通常有基线的版本收敛更快、更稳定
-```
-
----
-
-## 关键要点
-
-1. **基线减少方差**，不改变梯度期望
-2. **状态价值函数**是最常用的基线
-3. **带基线的策略梯度**是 Actor-Critic 的基础
-4. **优势函数** $A = G - V$ 衡量动作的好坏程度
+所以基线证明完毕。

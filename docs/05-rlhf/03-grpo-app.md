@@ -1,136 +1,247 @@
-# GRPO 应用场景
 
-## 医疗思维链
+```ad-note
+DPO：Direct Preference Optimization
 
-### 概述
-
-使用 GRPO 训练 LLM 生成更好的医疗推理链。
-
-### 奖励设计
-
-```python
-def medical_reward(prompt, response):
-    # 1. 格式奖励：是否有思维链格式
-    format_reward = check_cot_format(response)
-
-    # 2. 准确性奖励：答案是否正确
-    accuracy_reward = check_medical_accuracy(response)
-
-    # 3. 安全性奖励：是否有危险建议
-    safety_reward = check_safety(response)
-
-    return format_reward + accuracy_reward + safety_reward
+直接偏好优化：你的大语言模型实际上是一个奖励模型
 ```
 
-### 训练数据
+DPO，是基于人类反馈的强化学习（RLHF）的一种方法，它避免了真正的强化学习。
 
-```python
-medical_data = [
-    {
-        "prompt": "患者出现胸痛、呼吸困难，可能是什么疾病？",
-        "responses": [
-            "可能是心肌梗死，需要立即就医。",  # 简单回答
-            "根据症状分析：\n1. 胸痛 - 可能是心脏问题\n2. 呼吸困难 - 可能是肺部问题\n综合考虑，建议进行心电图和胸部CT检查。"  # 思维链
-        ]
-    }
-]
+## 1. 训练、微调和对齐 LLM
+
+让我们先回顾一下创建大语言模型（例如 ChatGPT 或 Claude）的流程。以下步骤是连续的，每个步骤都建立在前一个步骤的基础上：
+
+1. 基于互联网规模的数据预训练一个基础模型。给定一段文本，训练该模型预测下一个token。这个概念上简单的任务具有极好的扩展性，并允许 LLM 从训练数据中编码大量知识。基础模型的示例包括 GPT-3、Llama3 和 DeepSeek-V3 等等。
+2. 采用预先训练好的基础模型，并使用针对特定任务的数据集对与训练模型进行微调。例如，如果想创建像 ChatGPT 这样的实用的对话模型，则需要基于对话数据集进行微调，以使模型的输出听起来更像对话的片段，而不是维基百科页面。在此阶段，我们仍然使用下一个token预测任务，微调过程会更新我们的模型，使其预测结果更接近我们输入的高质量特定任务示例。例如：`Qwen2.5-3B-Instruct` 。
+3. 最后，我们根据人类偏好对模型进行微调。人类偏好之所以强大，是因为它们能够轻松且低成本地表达出来。试想一下，比较两部电影并选出一部你最喜欢的电影是多么容易。然而，制作一部能够体现驱使你去影院观看的特质的电影是多么困难。同样，准确描述我们希望模型如何表现（就像我们在步骤 2 中尝试做的那样）也具有挑战性，但给定模型行为的示例，我们可以轻松地指出对特定行为类型的偏好。有一段时间，这种偏好调整是使用 PPO-RLHF 完成的。最近，由于 DPO 相对简单，PPO-RLHF 在某种程度上已被 DPO 取代。已经使用人类偏好进行调整的 LLM 包括 Llama 3 Instruct、ChatGPT-4、Claude 3 Opus 和 Gemini Ultra。
+
+![[5.1.excalidraw|1000]]
+
+## 2. 使用偏好数据集微调 LLM
+
+为我们希望 LLM 模仿的行为创建高质量的示例数据集是一项艰巨而耗时的工作。聘请标注员来帮助我们创建此类数据的成本也相当高昂。然而，一旦我们拥有一个能够“足够好”地展示所需行为的模型，我们就可以全力以赴了。给定一个提示，我们可以通过注入少量随机性，从 LLM 中采样两种不同的响应。
+
+```ad-note
+使用相同的提示词，让 LLM 输出不同的回答。可以通过控制温度参数的方式来做到这一点。可以看一下这个 [网站](https://blog.lukesalamone.com/posts/what-is-temperature/) 理解一下温度的作用。
 ```
 
----
+然后，让标注员表达对两种回答之一的偏好既便宜又容易。
 
-## Text-To-SQL
+在使用 ChatGPT 或 Gemini 时，你可能注意到，偶尔会被要求在两个相似的答案中选择一个来继续对话。这个偏好会被记录下来，并用于在未来的偏好调整中改进模型。同样，Chatbot Arena 也会收集偏好数据，以便根据人工评估对 LLM 进行评级：
 
-### 概述
+![[5.2.excalidraw|1000]]
 
-使用 GRPO 训练 LLM 将自然语言转换为 SQL 查询。
+有许多公开可用的偏好数据集，例如 LMSys 的 Chatbot Arena Conversations 数据集、OpenAI 的 WebGPT Compares 数据集和 Anthropic 的 Helpfulness-Harmlessness RLHF 数据集（露骨/冒犯性内容警告）。
 
-### 奖励设计
+如果使用数学符号，那么这些数据集可以表示成
 
-```python
-def sql_reward(prompt, response):
-    # 1. 格式奖励：是否包含 SQL 代码块
-    format_reward = check_sql_format(response)
+$$
+\mathcal{D}=\{x^{(i)}, y_w^{(i)}, y_l^{(i)}\}^N_{i=1}
+$$
 
-    # 2. 执行奖励：SQL 是否能执行
-    try:
-        result = execute_sql(response)
-        execution_reward = 1.0
-    except:
-        execution_reward = 0.0
+其中 $x$ 是上下文或者提示词， $y_w$ 是人类喜欢的回答，而 $y_l$​ 是人类不喜欢的回答。
 
-    # 3. 正确性奖励：结果是否正确
-    correctness_reward = check_correctness(result, expected_result)
+### Bradley-Terry 模型
 
-    return format_reward + execution_reward + correctness_reward
+那么，我们该如何处理这些偏好数据呢？我们希望利用这些数据来微调我们的LLM，使其输出更符合偏好的响应。首先，让我们探索一个简单的概率模型：
+
+$$
+p^*(i \succ j) = \frac{s_i}{s_i+s_j}
+$$
+
+这是 Bradley-Terry 模型，用于对成对比较的结果进行建模。用通俗的话说，它就是“我们模拟真实的当 $i$ 的得分高于 $i$ 和 $j$ 的总得分时，结果 $i$ 优于结果 $j$ 的概率”。
+
+> $p^*$ 中“星号”的含义：表示我们正在建模人类偏好的真实潜在分布。同样，我们很快就会看到 $r^*$，它表示对大模型输出的回答进行评分的真实潜在奖励函数；以及 $\pi^*$，它表示我们希望 LLM 模仿的最优策略。
+
+Bradley-Terry 模型与 Elo 评分系统相关，该评分系统在国际象棋和其他竞技游戏中非常流行。Bradley-Terry 模型是 Elo 评分系统的推广，其中玩家 A 击败玩家 B 的概率为 $p(A\succ B) = \frac{1}{1+10^{(R_B-R_A)/400}}=\frac{s_A}{s_A+s_B}$ 。 这里 $R$ 表示一个玩家的评分，$s=10^{R/400}$ 。
+
+```ad-note
+所以如果玩家 A 的 Elo 的评分是 2000 以及玩家 B 的 Elo 的评分是 1600 ，那么玩家 A 获胜的可能性预计是玩家 B 的 10 倍，因为
+- $p(A\succ B) = \frac{1}{1+10^{(1600-2000)/400}}=10/11$ ，
+- $p(B\succ A)=\frac{1}{1+10^{(2000-1600)/400}}=1/11$ 。
 ```
 
-### 示例
+在 Bradley-Terry 模型下，通常选择将分数参数化为 $s=e^r$，其中 $r$ 代表奖励。“奖励”一词源自强化学习，在强化学习中，一系列更理想的行动会获得更大的奖励——类似于在电子游戏中表现更好就能获得更高的分数。
 
-```python
-text_to_sql_data = [
-    {
-        "prompt": "查询所有年龄大于25岁的用户的姓名和邮箱",
-        "responses": [
-            "SELECT name, email FROM users WHERE age > 25",  # 正确
-            "SELECT * FROM users",  # 不完整
-            "SELECT name FROM users WHERE age >= 25"  # 部分正确
-        ]
-    }
-]
+通过这种参数化，我们的模型开始看起来相当不错——通过 Sigmoid 函数传递的奖励值的简单差异
+
+$$
+p^*(i\succ j)=\frac{s_i}{s_i+s_j}=\frac{e^{R_i^*}}{e^{R_i^*}+e^{R_j^*}} = \frac{1}{1+e^{-(R^*_i-R_j^*)}} = \sigma(R_i^*-R_j^*)
+$$
+
+### 将 Bradley-Terry 模型应用到 LLM
+
+现在，我们希望采用 Bradley-Terry 模型并利用其与偏好数据集来改进我们的 LLM 生成的输出。
+
+在我们的偏好数据集（$\mathcal{D}$）中，我们有两个比较，我们希望建模其中一种补全方式比另一种更受欢迎的概率。从某种意义上说，每种补全方式都会根据其质量引发一些奖励，而我们的最终目标是推动我们的 LLM 产生更高质量的补全。因此，我们将使用 LLM 参数化奖励。我们将其称为 $R^*(x,y)$，这意味着奖励是上下文/提示（$x$）和补全（$y$）的函数。
+
+因此，在调整我们的偏好模型以使用我们的参数化奖励函数之后，我们得到：
+
+$$
+p^*(y_1\succ y_2|x)=\sigma(R^*(x,y_1),R^*(x,y_2))
+$$
+
+但是，仅仅谈论最优解和奖励对我们毫无意义，因为我们无法获得最优奖励函数。实践中，我们通常会学习一个模拟最优奖励函数的奖励模型 $R_\phi(x,y)$ 。我们可以将该奖励模型的参数 $\phi$ 定义为一个二分类问题，其目标是最小化偏好数据集 $\mathcal{D}$ 上的以下负对数似然损失函数：
+
+$$
+\mathcal{L}_R(R_\phi,\mathcal{D})=-\mathbb{E}_{(x,y_w,y_l)\sim\mathcal{D}}[\log(\sigma(R_\phi(x,y_w),R_\phi(x,y_l)))]
+$$
+
+在 RLHF 框架下，我们可以在强化学习环境中利用这个学习到的奖励模型来优化 LLM，使其输出获得高奖励的完成。然而，DPO 采取了不同的策略——与两阶段 RLHF 流程不同，DPO 重新参数化了 Bradley-Terry 模型，以便我们可以使用类似的损失函数直接优化 LLM 的参数，使其产生人类观察者偏好的输出。
+
+### 回答（补全）的概率
+
+目前，基于偏好或奖励来优化 LLM 的想法可能显得相当抽象。因此，我们将花点时间介绍一个新的概率函数 $\pi(y|x)$ ，它代表 LLM 的实际输出。在强化学习符号中， $\pi$ 表示策略，策略经过优化以最大化奖励。具体来说， $\pi_\theta(y|x)$ 表示假设我们从提示词 $x$ 开始，基于参数为 $\theta$ 的 LLM 生成回答 $y$ 的概率。
+
+“生成回答 $y$ 的概率”是什么意思？我们的 LLM 是一个自回归文本生成器，在每一步中，它都会为每个 token 计算一个概率值。
+
+![[5.4.excalidraw|1000]]
+
+因此，我们按顺序逐个处理回答 $y$ 中的每个 token，并计算出给定所有前面 token 的情况下，回答中下一个 token 的概率。现在，我们得到了回答中每个 token 的概率值！因此，我们可以计算生成 token 序列的联合概率，该概率是沿途观察到每个 token 的各个概率的乘积。
+
+$$
+\pi_\theta(y|x) = \prod_{t=0}^{|y|}p_{_{LLM_{\theta}}}(y_t|x,y_{0:t})
+$$
+
+另一种思考方式是，存在一棵可能的补全树，我们正在计算从根（提示词的末尾）到叶子（停止 token ）追踪一条特定路径的概率。
+
+![[5.5.excalidraw|1000]]
+
+在训练时，我们提前知道整个文本的补全情况，因此，通过应用因果注意力掩码，我们可以通过 LLM 的单次前向传播来计算所有单独的下一个 token 的概率（以及 $\pi_\theta(y|x)$ ）。
+
+## 3. 基于偏好优化我们的 LLM
+
+好了，现在我们的框架已经搭建完毕。让我们回顾一下我们的目标：提升 LLM 的输出。换句话说，我们希望 LLM 为提示词 $x$ 提供的补全 $y$ 能够产生较大的奖励 $R(x,y)$ 。考虑到这一点，我们可以构建一个优化问题，其中我们想要找到 $\text{LLM}_{\theta}$ 的参数，使其能够最大化类似于实际操作中出现的提示的预期奖励。
+
+$$
+\max_\theta\mathbb{E}_{x\sim\mathcal{D},y\sim\pi_\theta(y|x)}[R(x,y)]
+$$
+
+然而，这有点过于简单了。在实践中，我们从微调后的基础模型的参数入手，并且我们坚信微调后的基础模型产生的输出相当不错，所以我们不希望模型的输出发生太大的变化，除非它们能够显著提高奖励。考虑到这一点，我们修改了优化问题，加入了正则化约束，以帮助强化这种信念。
+
+$$
+\max_\theta\mathbb{E}_{x\sim\mathcal{D},y\sim\pi_\theta(y|x)}[R(x,y)]-\beta\mathbb{D}_\text{KL}[\pi_\theta(y|x)\Vert\pi_\text{ref}(y|x)]
+$$
+
+$\mathbb{D}[P\Vert Q]$ 是 Kullback-Leibler 散度，也就是 KL 散度，是一种统计距离度量。它量化了概率分布 $P$ 与概率分布 $Q$ 的差异。这个基于 KL 散度的约束恰好体现了这样一种想法：我们希望根据模型 $\pi_\theta$ 输出与初始微调模型（例如参考模型 $\pi_\text{ref}$ ）输出的差异程度，对模型输出进行惩罚。$\beta$ 是一个标量超参数，用于控制约束的强度。
+
+KL散度是众多用于正则化强化学习智能体策略的传统方法之一。在DPO和PPO-RLHF的案例中，KL散度是一个自然的选择，因为我们首先要有一个比较强大的参考模型——微调程序输出的LLM。
+
+现在，我们想要推导出这个优化问题的最优解。这将依赖于吉布斯不等式， $\mathbb{D}_\text{KL}[P\Vert Q]\ge 0$ 。当且仅当 $P=Q$ 时， $\mathbb{D}_\text{KL}[P\Vert Q]=0$ 。
+
+这里的直觉是，KL散度是一种距离测量（某种程度上），如果 $P$ 和 $Q$ 相等，则它们之间没有距离，如果它们不相等，则必定存在一定距离。
+
+$$
+\begin{aligned}
+& \max_\theta\mathbb{E}_{x\sim\mathcal{D},y\sim\pi_\theta(y|x)}[R(x,y)]-\beta\mathbb{D}_\text{KL}[\pi_\theta(y|x)\Vert\pi_\text{ref}(y|x)] \\
+= & \max_\theta\mathbb{E}_{x\sim\mathcal{D},y\sim\pi_\theta(y|x)}[R(x,y)]-\beta\mathbb{E}_{y\sim\pi_\theta(y|x)}\left[{\log\frac{\pi_\theta(y|x)}{\pi_\text{ref}(y|x)}}\right] \\
+= & \max_\theta\mathbb{E}_{x\sim\mathcal{D}}\mathbb{E}_{y\sim\pi_\theta(y|x)}\left[{R(x,y)-\beta\log\frac{\pi_\theta(y|x)}{\pi_\text{ref}(y|x)}}\right] \\
+= & \min_\theta\mathbb{E}_{x\sim\mathcal{D}}\mathbb{E}_{y\sim\pi_\theta(y|x)}\left[{\log\frac{\pi_\theta(y|x)}{\pi_\text{ref}(y|x)}-\frac{1}{\beta}R(x,y)}\right] \\
+= & \min_{\theta}\mathbb{E}_{x\sim \mathcal{D}}\mathbb{E}_{y\sim \pi_\theta(y|x)}\left[\log\frac{\pi_\theta(y|x)}{\frac{1}{Z(x)}\pi_{\text{ref}}(y|x)e^{\frac{1}{\beta}R(x,y)}} - \log Z(x)\right] = \dots
+\end{aligned}
+$$
+
+其中 $Z(x)=\sum_y\pi_{\text{ref}}(y|x)e^{\frac{1}{\beta}R(x,y)}$ 。重要的是，这个 $Z(x)$ 项仅取决于 $x$ 和 $\pi_\text{ref}$ ，而不取决于 $y$ 和 $\pi_\theta$ 。所以有如下式子
+
+$$
+\begin{aligned}
+\dots &= \min_{\theta}\mathbb{E}_{x\sim \mathcal{D}}\left[\mathbb{E}_{y\sim \pi_\theta(y|x)}\left[\log\frac{\pi_\theta(y|x)}{\frac{1}{Z(x)}\pi_{ref}(y|x)e^{\frac{1}{\beta}R(x,y)}}\right] - \log Z(x)\right] \\
+&= \min_{\theta}\mathbb{E}_{x\sim \mathcal{D}}\left[\mathbb{D}_\text{KL}\left(\pi_\theta(y|x)\ \Vert\ \frac{1}{Z(x)}\pi_{ref}(y|x)e^{\frac{1}{\beta}R(x,y)}\right) - \log Z(x)\right] \\
+\end{aligned}
+$$
+
+我们快要成功了！由于 $Z(x)$ 不依赖于 $π_θ$，因此在推导最优解时我们可以忽略它。现在我们可以使用上面提到的吉布斯不等式：当且仅当 $\Vert$ 两边的两个分布相同时，$\mathbb{D}_\text{KL}\left(\pi_\theta(y|x)\ \Vert\ \frac{1}{Z(x)}\pi_{ref}(y|x)e^{\frac{1}{\beta}R(x,y)}\right)$ 最小为零。因此，对于所有 $x\in \mathcal{D}$，我们的优化问题的最优解（记为 $\pi^*$ ）是：
+
+$$
+\pi^*(y|x)=\pi_\theta(y|x)=\frac{1}{Z(x)}\pi_\text{ref}(y|x)e^{\frac{1}{\beta}R(x,y)}
+$$
+
+### 直接偏好优化
+
+所以我们知道了优化问题的最优解，但我们能得到它吗？不能。$Z(x)=\sum_y\pi_\text{ref}(y|x)e^{\frac{1}{\beta}R(x,y)}$ 很难计算——计算它需要对所有可能的字符串进行求和。
+
+相反，我们可以重新组织上面的最优解，以便用最优策略 $\pi_\theta$ 、参考策略 $\pi_\text{ref}$ 和难解函数 $Z$ 来表达奖励函数：
+
+$$
+R(x,y) = \beta\log\frac{\pi_\theta(y|x)}{\pi_\text{ref}(y|x)}+\beta\log Z(x)
+$$
+
+可以使用底层真实奖励 $R^*$ 及其对应的最优策略 $\pi^*$ 来应用相同的重组。
+
+$$
+R^*(x,y) = \beta\log\frac{\pi^*_\theta(y|x)}{\pi_\text{ref}(y|x)}+\beta\log Z(x)
+$$
+
+现在，DPO 的作者们注意到了一个巧妙的技巧。我们可以利用这个重新组织的优化问题最优解表达式，重新参数化上面的 Bradley-Terry 偏好模型，使其以最优策略 $\pi^*$ 的形式表示，而不是以底层奖励函数的形式！更妙的是，一旦我们把所有参数代入，就会发现难以处理的 $Z(x)$ 函数被抵消了！
+
+$$
+\begin{aligned}
+p^*(y_1 \succ y_2 | x) &= \sigma(R^*(x,y_1)-R^*(x,y_2)) \\
+&= \sigma\left({\beta\log\frac{\pi^*(y_1|x)}{\pi_\text{ref}(y_1|x)}} + \beta\log Z(x) - \left({{\beta\log\frac{\pi^*(y_2|x)}{\pi_\text{ref}(y_2|x)}} + \beta\log Z(x)}\right)\right) \\
+&= \sigma\left({\beta\log\frac{\pi^*(y_1|x)}{\pi_\text{ref}(y_1|x)}-\beta\log\frac{\pi^*(y_2|x)}{\pi_\text{ref}(y_2|x)}}\right)
+\end{aligned}
+$$
+
+现在，有了重新参数化的 Bradley-Terry 模型，我们可以使用监督学习直接学习一个模拟最优策略的策略。我们可以最小化偏好数据集 $\mathcal{D}$ 上的负对数似然损失函数，以估计策略 $\pi_\theta$ 的参数：
+
+$$
+\begin{aligned}
+\mathcal{L}_{DPO}(\pi_\theta;\pi_{ref}) &= -\mathbb{E}_{(y_w,y_l,x)\sim \mathcal{D}}\left[\log\left(\sigma\left(\beta\log{\frac{\pi_\theta(y_w|x)}{\pi_{ref}(y_w|x)}} - \beta\log{\frac{\pi_\theta(y_l|x)}{\pi_{ref}(y_l|x)}}\right)\right)\right] \\
+&= -\mathbb{E}_{(y_w,y_l,x)\sim \mathcal{D}}\left[\log\left(\sigma\left(\beta\left(\log{\frac{\pi_\theta(y_w|x)}{\pi_\theta(y_l|x)}} - \log{\frac{\pi_{ref}(y_w|x)}{\pi_{ref}(y_l|x)}}\right)\right)\right)\right]
+\end{aligned}
+$$
+
+![[7.1.excalidraw|1000]]
+
+$$
+\log\frac{A}{B}-\log \frac{C}{D} = (\log A-\log B) - (\log C-\log D)
+$$
+
+
+回想一下，上面我们优化了一个负对数似然损失来估计奖励模型的参数，然后 RLHF 将其用于估计策略模型的参数。但现在我们直接根据人类偏好来优化 LLM 策略模型的参数！因此，我们称之为直接偏好优化。
+
+![[5.3.excalidraw|1000]]
+
+DPO 相对于 PPO-RLHF 的优势：
+
+1. 避免了训练奖励模型来估计人类偏好
+2. 避免进行任何类型的强化学习，因为众所周知，强化学习非常困难
+3. 我们可以使用监督学习直接根据人类偏好优化我们的LLM，这是一个更加直接和易于理解的过程
+
+避免强化学习尤为重要。DPO让偏好调整过程对那些缺乏时间、资源或专业知识来应对强化学习复杂性的从业者来说变得更加便捷。
+
+### DPO的性质和注意事项
+
+DPO的一个关键特性是，当 Bradley-Terry 模型 **完美** 拟合我们的偏好数据，并且 PPO-RLHF学习到最优奖励函数时，PPO-RHLF和DPO的全局优化器是相同的。
+
+这是一个重要的等价结果；然而在实践中：
+
+1. Bradley-Terry 模型通常不能完美地拟合偏好数据。
+2. PPO-RLHF学习到的奖励函数不会是最优的奖励函数。
+3. 在高度非凸的损失景观（例如LLM）上进行梯度下降找不到全局优化器。
+
+```ad-note
+例如，偏好循环会导致 Bradley-Terry 模型无法完美拟合数据。Bradley-Terry 模型假设偏好具有传递性。例如，如果 $A \succ B$ 和 $B \succ C$ 成立，则模型预期结果为 $A \succ B \succ C$ 。但如果结果为 $C \succ A$ ，则存在循环，传递性被破坏。
 ```
 
----
+DPO的另一个缺点是由于缺乏正则化，容易出现过拟合。Azar等人提供了一个令人信服的例子：
 
-## 代码生成
+```ad-cite
+title: DPO容易过拟合
 
-### 奖励设计
+考虑一个简单的例子，我们有两个动作 $y_1$​ 和 $y_2$​ ，并且 $p^*(y_1\succ y_2)=1$ ，即 $y_1$ 总是优于 $y_2$ 。那么 Bradley-Terry 模型就要求 $(R(y_1)-R(y_2))\rightarrow\infty$ 必须满足。如果我们将其代入最优策略，就会得到 $\frac{\pi^*(y_2)}{\pi^*(y_1)}=0$ ，也就是 $\pi^*(y_2)=0$ 。 因此，偏好越确定，KL正则化的强度就越弱。
 
-```python
-def code_reward(prompt, response):
-    # 1. 格式奖励：是否有代码块
-    format_reward = check_code_format(response)
-
-    # 2. 编译奖励：代码是否能编译
-    try:
-        compile(response, '<string>', 'exec')
-        compile_reward = 1.0
-    except:
-        compile_reward = 0.0
-
-    # 3. 测试奖励：是否通过测试用例
-    test_reward = run_tests(response, test_cases)
-
-    # 4. 效率奖励：代码效率
-    efficiency_reward = check_efficiency(response)
-
-    return format_reward + compile_reward + test_reward + efficiency_reward
+DPO的泛化能力不如PPO。
 ```
 
----
+他们还指出，实际上，我们拥有的偏好数据量是有限的。因此，我们很可能仅仅因为只看到了 $y$ 和 $y'$ 之间少量的比较就凭经验估计出 $p(y_1\succ y_2)=1$ 。因此，无论试图使策略与参考策略保持相似的正则化项如何，经验最优策略都会推动 $\pi(y_2)=0$ 。
 
-## 数学推理
+尽管存在这些缺点，DPO仍然是一种非常有效的工具；许多最成功和性能最好的开源 LLM 都是使用 DPO 进行指令微调的。
 
-### 奖励设计
+```ad-danger
+title: DPO后续的工作
 
-```python
-def math_reward(prompt, response):
-    # 1. 格式奖励：是否有推理过程
-    format_reward = check_reasoning_format(response)
-
-    # 2. 步骤奖励：推理步骤是否合理
-    step_reward = check_reasoning_steps(response)
-
-    # 3. 答案奖励：最终答案是否正确
-    answer_reward = check_final_answer(response, expected_answer)
-
-    return format_reward + step_reward + answer_reward
+- KTO：如果只有正例，则计算正例的损失。如果只有负例，则计算负例的损失。如果同时有正负例子，则蜕变为DPO。
+- SimPO：去掉参考模型
 ```
 
----
-
-## 关键要点
-
-1. **奖励设计**是 GRPO 成功的关键
-2. **格式奖励**确保输出结构化
-3. **正确性奖励**确保结果准确
-4. **安全性奖励**避免有害输出

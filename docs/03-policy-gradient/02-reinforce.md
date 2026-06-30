@@ -1,159 +1,113 @@
-# REINFORCE 算法
+贝尔曼期望方程的推导
 
-## 算法原理
+$$
+\begin{aligned}
+V_\pi(S_t) &= \mathbb{E}_\pi[G_t|S_t] \\
+&= \mathbb{E}_\pi\left[\sum_{k=0}^\infty\gamma^kR_{t+k}\mid S_t\right] \\
+&= \mathbb{E}_\pi\left[R_t+\gamma\sum_{k=0}^\infty\gamma^kR_{t+k+1}\mid S_t\right] \\
+&= \mathbb{E}_\pi[R_t+\gamma G_{t+1}|S_t] \\
+&= \mathbb{E}_\pi[R_t|S_t]+\gamma \mathbb{E}_\pi[G_{t+1}|S_t] \\
+&= \mathbb{E}_\pi[R_t|S_t]+\gamma \mathbb{E}_\pi[\mathbb{E}_\pi [G_{t+1}|S_{t+1}]|S_t] \\
+&= \mathbb{E}_\pi[R_t|S_t]+\gamma \mathbb{E}_\pi[V_\pi(S_{t+1})|S_t] \\
+&= \mathbb{E}_\pi[R_t+\gamma V_\pi(S_{t+1})|S_t] \\
+\end{aligned}
+$$
 
-REINFORCE 是最基础的策略梯度算法，通过采样完整轨迹来估计策略梯度。
-
-### 算法流程
-
+```ad-note
+全期望公式：$\mathbb{E}[X]=\mathbb{E}[\mathbb{E}[X|Y]]$
+条件期望的迭代公式：$\mathbb{E}[X|Y]=\mathbb{E}[\mathbb{E}[X|Z]|Y]$
 ```
-1. 初始化策略参数 θ
-2. 对于每个episode:
-   a. 使用当前策略采样一条完整轨迹 τ
-   b. 计算每个时刻的回报 G_t
-   c. 计算策略梯度: ∇J(θ) = ∑_t ∇log π_θ(a_t|s_t) · G_t
-   d. 更新参数: θ ← θ + α∇J(θ)
+
+我们如何估计或者计算优势函数 $A$ 呢？目前比较常用的一种方法为 **广义优势估计**（Generalized Advantage Estimation，GAE），接下来我们简单介绍一下GAE的做法。首先，用
+
+$$
+\delta_t=R_t+\gamma V(s_{t+1})-V(s_t)
+$$
+
+表示 **1步** 时序差分误差（TD误差）。其中 $V$ 是一个价值函数神经网络。于是，根据多步时序差分的思想，有：
+
+$$
+\begin{aligned}
+A_t^{(1)} &= \delta_t &&= -V(s_t)+R_t+\gamma V(s_{t+1}) \\
+A_t^{(2)} &= \delta_t+\gamma\delta_{t+1} &&= -V(s_t)+R_t+\gamma R_{t+1}+\gamma^2 V(s_{t+2}) \\
+A_t^{(3)} &= \delta_t+\gamma\delta_{t+1}+\gamma^2 \delta_{t+2} &&= -V(s_t)+R_t+\gamma R_{t+1}+ \gamma^2R_{t+2} +\gamma^3 V(s_{t+3}) \\
+&\quad\vdots &&\quad\quad\vdots \\
+A_t^{(k)} &= \sum_{l=0}^{k-1}\gamma^l\delta_{t+l} &&= -V(s_t)+R_t+\gamma R_{t+1}+\cdots+\gamma^{k-1}R_{t+k-1}+\gamma^kV(s_{t+k})
+\end{aligned}
+$$
+
+```ad-tip
+GAE并没有单独使用某个 $n$ 步误差
 ```
 
----
+$$
+f(x) = 1 + x + x^2 + \cdots + x^n = \frac{1-x^n}{1-x}
+$$
 
-## 代码实现
+然后，GAE将这些不同步数的优势估计进行指数加权平均：
 
-### 完整实现
+$$
+\begin{aligned}
+A_t^{\text{GAE}} &= (1-\lambda)(A_t^{(1)}+\lambda A_t^{(2)}+\lambda^2A_t^{(3)}+\cdots) \\
+&= (1-\lambda)(\delta_t+\lambda(\delta_t+\gamma\delta_{t+1})+\lambda^2(\delta_t+\gamma\delta_{t+1}+\gamma^2\delta_{t+2})+\cdots) \\
+&= (1-\lambda)(\delta_t(1+\lambda+\lambda^2+\cdots)+\gamma\delta_{t+1}(\lambda+\lambda^2+\lambda^3+\cdots)+\gamma^2\delta_{t+2}(\lambda^2+\lambda^3+\lambda^4+\cdots)+\cdots) \\
+&= (1-\lambda)\left({\delta_t\frac{1}{1-\lambda}+\gamma\delta_{t+1}\frac{\lambda}{1-\lambda}+\gamma^2\delta_{t+2}\frac{\lambda^2}{1-\lambda}+\cdots}\right) \\
+&= \sum_{l=0}^{\infty}(\gamma\lambda)^l\delta_{t+l}
+\end{aligned}
+$$
+
+其中，$\lambda\in [0,1]$ 是在GAE中额外引入的一个超参数。当 $\lambda=0$ 时，$A_t^{\text{GAE}}=\delta_t=R_t+\gamma V(s_{t+1})-V(s_t)$ ，也就是仅仅只看一步差分得到的优势；当 $\lambda=1$ 时，$A_t^{\text{GAE}}=\sum_{l=0}^{\infty}\gamma^l\delta_{t+l}=\sum_{l=0}^{\infty}\gamma^lR_{t+l}-V(s_t)$ ，则是看每一步差分得到的优势的完全平均值。
+
+有上面的式子，我们还可以推导出一个递推公式
+
+```ad-note
+$$
+A_t = \delta_t + \gamma\lambda A_{t+1}
+$$
+```
+
+下面是计算GAE的代码，给定 $\gamma$ 和 $\lambda$ 以及每个时间步的 $\delta_t$ 之后，我们可以根据公式直接进行优势估计。
+
+先forward计算每一个时刻的 **单步TD误差** ，然后再backward计算每一个时刻的GAE。
+
+首先，我们有 $n$ 个单步TD误差。
+
+$$
+\text{TD}_\delta = \left[\delta_t, \delta_{t+1}, \dots, \delta_{t+n}\right]
+$$
+先把数组逆序
+
+$$
+\text{TD}_\delta = \left[\delta_{t+n}, \delta_{t+n-1}, \dots, \delta_{t}\right]
+$$
+
+然后遍历逆序数组，有如下结果：
+
+$$
+\begin{aligned}
+A_{t+n} &= \delta_{t+n} \\
+A_{t+n-1} &= \delta_{t+n-1} + \gamma\lambda A_{t+n} \\
+A_{t+n-2} &= \delta_{t+n-2} + \gamma\lambda A_{t+n-1} \\
+\vdots \\
+A_t &= \delta_t + \gamma\lambda A_{t+1}
+\end{aligned}
+$$
+
+这样每一个时间步的广义优势估计就计算出来了。代码如下：
 
 ```python
-import torch
-import torch.nn as nn
-import torch.optim as optim
-from torch.distributions import Categorical
-import gym
-import numpy as np
-
-class PolicyNetwork(nn.Module):
-    def __init__(self, state_dim, action_dim, hidden_dim=128):
-        super().__init__()
-        self.fc1 = nn.Linear(state_dim, hidden_dim)
-        self.fc2 = nn.Linear(hidden_dim, action_dim)
-
-    def forward(self, state):
-        x = torch.relu(self.fc1(state))
-        x = self.fc2(x)
-        return torch.softmax(x, dim=-1)
-
-    def get_action(self, state):
-        probs = self.forward(torch.FloatTensor(state))
-        dist = Categorical(probs)
-        action = dist.sample()
-        return action.item(), dist.log_prob(action)
-
-
-def compute_returns(rewards, gamma=0.99):
-    """计算回报 G_t = R_t + γR_{t+1} + γ²R_{t+2} + ..."""
-    returns = []
-    G = 0
-    for r in reversed(rewards):
-        G = r + gamma * G
-        returns.insert(0, G)
-    return torch.FloatTensor(returns)
-
-
-def reinforce(env, policy, optimizer, gamma=0.99, num_episodes=1000):
-    """REINFORCE 算法"""
-    episode_rewards = []
-
-    for episode in range(num_episodes):
-        # 收集轨迹
-        log_probs = []
-        rewards = []
-
-        state = env.reset()
-        done = False
-
-        while not done:
-            action, log_prob = policy.get_action(state)
-            next_state, reward, done, _ = env.step(action)
-
-            log_probs.append(log_prob)
-            rewards.append(reward)
-            state = next_state
-
-        # 计算回报
-        returns = compute_returns(rewards, gamma)
-        returns = (returns - returns.mean()) / (returns.std() + 1e-8)
-
-        # 计算损失
-        loss = 0
-        for log_prob, G in zip(log_probs, returns):
-            loss -= log_prob * G
-
-        # 更新
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-
-        episode_rewards.append(sum(rewards))
-
-        if episode % 100 == 0:
-            print(f"Episode {episode}, Avg Reward: {np.mean(episode_rewards[-100:]):.2f}")
-
-    return episode_rewards
+def compute_advantage(gamma, lmbda, td_delta):
+    # 每一步的单步TD误差组成的数组 [δ_0, δ_1, ..., δ_n]
+    td_delta = td_delta.detach().numpy()
+    advantage_list = []
+    advantage = 0.0
+    # 逆序遍历
+    for delta in td_delta[::-1]:
+        # A_t = δ_t + γλA_{t+1}
+        advantage = gamma * lmbda * advantage + delta
+        advantage_list.append(advantage)
+    # 每一步的广义优势估计，逆序以后就变成了 [GAE_0, GAE_1, ..., GAE_n]
+    advantage_list.reverse()
+    return torch.tensor(advantage_list, dtype=torch.float)
 ```
 
-### 训练脚本
-
-```python
-def main():
-    env = gym.make("CartPole-v0")
-    policy = PolicyNetwork(4, 2)
-    optimizer = optim.Adam(policy.parameters(), lr=0.001)
-
-    rewards = reinforce(env, policy, optimizer)
-
-if __name__ == "__main__":
-    main()
-```
-
----
-
-## 优缺点
-
-### 优点
-
-- ✅ 简单直观，易于实现
-- ✅ 无偏估计
-- ✅ 适用于连续动作空间
-
-### 缺点
-
-- ❌ 方差大，收敛慢
-- ❌ 样本效率低
-- ❌ 只能用于回合制任务
-
----
-
-## 变体
-
-### 1. 带基线的 REINFORCE
-
-```python
-# 使用状态价值作为基线
-advantages = returns - values.detach()
-loss = -log_probs * advantages
-```
-
-### 2. 带熵正则化的 REINFORCE
-
-```python
-# 鼓励探索
-entropy = -torch.sum(probs * torch.log(probs + 1e-8))
-loss = policy_loss - beta * entropy
-```
-
----
-
-## 关键要点
-
-1. REINFORCE 是最基础的策略梯度算法
-2. 方差大是主要问题
-3. 基线可以有效减少方差
-4. 是理解 Actor-Critic 和 PPO 的基础
