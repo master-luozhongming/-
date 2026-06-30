@@ -81,11 +81,7 @@ export default defineConfig({
         {
           text: '策略梯度法',
           items: [
-            { text: '1. 原始策略梯度法', link: '/03-policy-gradient/01-vanilla-pg' },
-            { text: '2. REINFORCE', link: '/03-policy-gradient/02-reinforce' },
-            { text: '3. 带基线的策略梯度', link: '/03-policy-gradient/03-baseline' },
-            { text: '4. Actor-Critic', link: '/03-policy-gradient/04-actor-critic' },
-            { text: '5. 广义优势估计', link: '/03-policy-gradient/05-gae' }
+            { text: '05 策略梯度法', link: '/03-policy-gradient/01-vanilla-pg' }
           ]
         }
       ],
